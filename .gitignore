@@ -1,0 +1,22 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Env variables
+.env
+.venv/
+venv/
+ENV/
+
+# Project specific ignores
+captures/
+exports/
+logs/
+recordings/
+weights/
+*.pt
+
+# IDE
+.vscode/
+.idea/
