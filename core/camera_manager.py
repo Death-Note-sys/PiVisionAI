@@ -43,6 +43,7 @@ class CameraManager:
             
             self.cap = None
             self.current_frame = None
+            self.raw_frame = None
             self.is_running = False
             self.thread = None
             self.lock = threading.Lock()
@@ -162,6 +163,9 @@ class CameraManager:
                 logger.error("Failed to grab frame. Camera might be disconnected.")
                 self.is_connected = False
                 continue
+                
+            with self.lock:
+                self.raw_frame = frame.copy()
 
             # Calculate FPS
             current_time = time.time()
@@ -173,7 +177,13 @@ class CameraManager:
 
             # Process frame through active modules
             try:
+                inf_start = time.time()
                 processed_frame = self.module_manager.process_frame(frame)
+                inf_time_ms = (time.time() - inf_start) * 1000.0
+                
+                if hasattr(self, 'analytics_manager') and self.analytics_manager:
+                    active_id = self.module_manager.active_module_id
+                    self.analytics_manager.log_inference(inf_time_ms, active_id)
             except Exception as e:
                 logger.error(f"Error processing frame: {e}")
                 processed_frame = frame

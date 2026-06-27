@@ -40,10 +40,24 @@ document.addEventListener('DOMContentLoaded', () => {
     let availableModulesData = []; // Store fetched metadata
 
     // --- Helper Functions ---
+    const toastContainer = document.querySelector('.toast-container');
     const showToast = (message, type='primary') => {
-        toastMessage.textContent = message;
-        toastEl.className = `toast align-items-center text-bg-${type} border-0`;
-        bsToast.show();
+        const toastHtml = `
+        <div class="toast align-items-center text-bg-${type} border-0 show" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body">${message}</div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        </div>`;
+        const wrap = document.createElement('div');
+        wrap.innerHTML = toastHtml;
+        const toastEl = wrap.firstElementChild;
+        if(toastContainer) toastContainer.appendChild(toastEl);
+        
+        setTimeout(() => {
+            toastEl.classList.remove('show');
+            setTimeout(() => toastEl.remove(), 300);
+        }, 3000);
     };
 
     // --- Initial Fetch of Modules ---
@@ -99,6 +113,40 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error("Failed to switch camera", err);
         }
     });
+
+    // --- View Navigation (SPA) ---
+    const viewTabs = document.querySelectorAll('.view-tab');
+    const viewSections = document.querySelectorAll('.view-section');
+    viewTabs.forEach(tab => {
+        tab.addEventListener('click', (e) => {
+            e.preventDefault();
+            viewTabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            
+            const targetId = tab.getAttribute('data-target');
+            viewSections.forEach(sec => {
+                if(sec.id === targetId) {
+                    sec.classList.remove('d-none');
+                    sec.classList.add('d-flex'); // or block if not flex
+                } else {
+                    sec.classList.add('d-none');
+                    sec.classList.remove('d-flex');
+                }
+            });
+            
+            if (targetId === 'analytics-view') {
+                initCharts();
+            }
+        });
+    });
+
+    // --- Settings & Theme ---
+    const selTheme = document.getElementById('setTheme');
+    if (selTheme) {
+        selTheme.addEventListener('change', (e) => {
+            document.body.className = e.target.value;
+        });
+    }
 
     fetchModules();
     fetchCameras();
@@ -275,34 +323,95 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Actions ---
-    btnScreenshot.addEventListener('click', () => {
-        showToast('Screenshot saved to captures/', 'success');
-        // In a real app, this would fetch to a Flask /api/screenshot endpoint
+    btnScreenshot.addEventListener('click', async () => {
+        const fmt = document.getElementById('screenshotFormat')?.value || 'PNG';
+        const feed = document.getElementById('mediaFeed')?.value || 'Processed Feed';
+        
+        try {
+            const res = await fetch('/api/media/screenshot', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ format: fmt, quality: 100, feed: feed })
+            });
+            const data = await res.json();
+            if(data.success) {
+                showToast(`Screenshot saved as ${data.filename}`, 'success');
+            } else {
+                showToast('Screenshot failed: ' + data.error, 'danger');
+            }
+        } catch(err) {
+            console.error(err);
+            showToast('Screenshot request failed', 'danger');
+        }
     });
 
-    btnRecord.addEventListener('click', () => {
-        isRecording = true;
-        btnRecord.classList.add('d-none');
-        btnStopRecord.classList.remove('d-none');
-        showToast('Recording started...', 'danger');
+    btnRecord.addEventListener('click', async () => {
+        const codec = document.getElementById('videoCodec')?.value || 'H264';
+        const fmt = (codec === 'XVID' || codec === 'MJPEG') ? 'AVI' : 'MP4';
+        const feed = document.getElementById('mediaFeed')?.value || 'Processed Feed';
+        
+        try {
+            const res = await fetch('/api/media/record/start', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ format: fmt, codec: codec, feed: feed })
+            });
+            const data = await res.json();
+            if(data.success) {
+                isRecording = true;
+                btnRecord.classList.add('d-none');
+                btnStopRecord.classList.remove('d-none');
+                showToast('Recording started...', 'danger');
+            } else {
+                showToast('Failed to start recording: ' + data.error, 'danger');
+            }
+        } catch(err) {
+            console.error(err);
+            showToast('Recording request failed', 'danger');
+        }
     });
 
-    btnStopRecord.addEventListener('click', () => {
-        isRecording = false;
-        btnStopRecord.classList.add('d-none');
-        btnRecord.classList.remove('d-none');
-        showToast('Recording saved to recordings/', 'success');
+    btnStopRecord.addEventListener('click', async () => {
+        try {
+            const res = await fetch('/api/media/record/stop', { method: 'POST' });
+            const data = await res.json();
+            if(data.success) {
+                isRecording = false;
+                btnStopRecord.classList.add('d-none');
+                btnRecord.classList.remove('d-none');
+                showToast(`Recording saved. Duration: ${data.duration}s`, 'success');
+            } else {
+                showToast('Failed to stop recording', 'danger');
+            }
+        } catch(err) {
+            console.error(err);
+        }
     });
 
     btnDownload.addEventListener('click', async () => {
         showToast('Exporting data...', 'info');
+        const fmt = document.getElementById('exportFormat')?.value || 'CSV';
+        
         try {
-            const res = await fetch('/api/modules/interact', {
+            let res = await fetch('/api/export', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ format: fmt })
+            });
+            let data = await res.json();
+            
+            if (data.success) {
+                showToast(`Data exported as ${data.filename}! Check Gallery.`, 'success');
+                return;
+            }
+            
+            // Fallback for older modules
+            res = await fetch('/api/modules/interact', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ action: 'export' })
             });
-            const data = await res.json();
+            data = await res.json();
             if (data.type === 'download') {
                 const blob = new Blob([data.data], { type: data.mimetype || 'text/plain' });
                 const url = window.URL.createObjectURL(blob);
@@ -313,11 +422,32 @@ document.addEventListener('DOMContentLoaded', () => {
                 window.URL.revokeObjectURL(url);
                 showToast('Data exported successfully!', 'success');
             } else {
-                showToast('Action successful.', 'success');
+                showToast('No export data available for this module.', 'warning');
             }
         } catch(err) {
             console.error("Export failed", err);
             showToast('Export failed.', 'danger');
+        }
+    });
+    
+    // --- Keyboard Shortcuts ---
+    document.addEventListener('keydown', (e) => {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
+        
+        if (e.key.toLowerCase() === 's' && !e.ctrlKey) {
+            btnScreenshot.click();
+        } else if (e.key.toLowerCase() === 'r' && !e.ctrlKey) {
+            if (!isRecording) btnRecord.click();
+        } else if (e.key === 'Escape') {
+            if (isRecording) btnStopRecord.click();
+        } else if (e.ctrlKey && e.key >= '1' && e.key <= '5') {
+            e.preventDefault();
+            const mods = [null, 'object-detection', 'measurement', 'ocr', 'color-detector', 'face-detection'];
+            const modId = mods[parseInt(e.key)];
+            if (modId) {
+                const link = Array.from(moduleLinks).find(l => l.getAttribute('data-module') === modId);
+                if (link) link.click();
+            }
         }
     });
 
@@ -381,6 +511,44 @@ document.addEventListener('DOMContentLoaded', () => {
                     cameraTitleText.textContent = `Primary Feed`;
                     metricFps.textContent = "0.0";
                 }
+                
+                // Real Telemetry
+                if (data.telemetry) {
+                    const tel = data.telemetry;
+                    metricCpu.textContent = `${tel.cpu_usage}%`;
+                    barCpu.style.width = `${tel.cpu_usage}%`;
+                    if(tel.cpu_usage > 80) barCpu.className = 'progress-bar bg-danger';
+                    else if(tel.cpu_usage > 50) barCpu.className = 'progress-bar bg-warning';
+                    else barCpu.className = 'progress-bar bg-accent';
+                    
+                    const memPct = Math.round((tel.ram_usage / (tel.ram_total || 1)) * 100);
+                    metricMem.textContent = `${tel.ram_usage} GB / ${tel.ram_total} GB`;
+                    barMem.style.width = `${memPct}%`;
+                    
+                    document.getElementById('stat-net-rx').textContent = `${tel.net_speed_rx} Mbps`;
+                    document.getElementById('stat-net-tx').textContent = `${tel.net_speed_tx} Mbps`;
+                    
+                    const diskPct = Math.round((tel.disk_usage / (tel.disk_total || 1)) * 100);
+                    document.getElementById('stat-disk').textContent = `${diskPct}%`;
+                    
+                    // Format Uptime
+                    let upStr = `${tel.uptime}s`;
+                    if(tel.uptime > 60) upStr = `${Math.floor(tel.uptime/60)}m ${tel.uptime%60}s`;
+                    if(tel.uptime > 3600) upStr = `${Math.floor(tel.uptime/3600)}h ${Math.floor((tel.uptime%3600)/60)}m`;
+                    document.getElementById('stat-uptime').textContent = upStr;
+                    
+                    updateCharts(tel, data.analytics);
+                }
+                
+                // Real Analytics
+                if (data.analytics) {
+                    const a = data.analytics;
+                    document.getElementById('stat-objects').textContent = a.objects_detected || 0;
+                    document.getElementById('stat-ocr').textContent = a.ocr_reads || 0;
+                    document.getElementById('stat-barcode').textContent = a.barcode_scans || 0;
+                    document.getElementById('stat-inf').textContent = `${a.avg_inference_time || 0}ms`;
+                }
+
             }
         } catch (error) {
             console.error('Error fetching status:', error);
@@ -397,28 +565,63 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Simulate fluctuating performance metrics
-    // Simulate fluctuating CPU/Memory based on modules
-    function updateMockPerformance() {
-        // CPU fluctuates between 10% and 40% based on active modules
-        const baseCpu = 15;
-        const moduleLoad = activeModulesMap.size * 5;
-        const cpu = Math.min(100, baseCpu + moduleLoad + Math.floor(Math.random() * 5));
-        metricCpu.textContent = `${cpu}%`;
-        barCpu.style.width = `${cpu}%`;
+    // --- Charts ---
+    let telemetryChart = null;
+    let moduleChart = null;
+    let chartTimeLabel = 0;
+    
+    function initCharts() {
+        const ctxTel = document.getElementById('telemetryChart');
+        if (ctxTel && !telemetryChart) {
+            telemetryChart = new Chart(ctxTel, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        { label: 'CPU %', data: [], borderColor: '#ef4444', tension: 0.4 },
+                        { label: 'RAM (GB)', data: [], borderColor: '#3b82f6', tension: 0.4 },
+                        { label: 'GPU %', data: [], borderColor: '#10b981', tension: 0.4 }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false, animation: false, scales: { y: { min: 0 } } }
+            });
+        }
         
-        if(cpu > 80) barCpu.className = 'progress-bar bg-danger';
-        else if(cpu > 50) barCpu.className = 'progress-bar bg-warning';
-        else barCpu.className = 'progress-bar bg-accent';
+        const ctxMod = document.getElementById('moduleChart');
+        if (ctxMod && !moduleChart) {
+            moduleChart = new Chart(ctxMod, {
+                type: 'doughnut',
+                data: {
+                    labels: [],
+                    datasets: [{ data: [], backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#0ea5e9'] }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        }
+    }
 
-        // Mem fluctuates slowly
-        const memGB = (2.4 + (Math.random() * 0.2 - 0.1) + (activeModulesMap.size * 0.1)).toFixed(1);
-        const memPercent = Math.min(100, Math.floor((memGB / 4.0) * 100)); // Assuming 4GB Pi
-        metricMem.textContent = `${memGB} GB`;
-        barMem.style.width = `${memPercent}%`;
+    function updateCharts(tel, analytics) {
+        if (!telemetryChart) return;
         
-        if(memPercent > 80) barMem.className = 'progress-bar bg-danger';
-        else barMem.className = 'progress-bar bg-warning';
+        chartTimeLabel++;
+        telemetryChart.data.labels.push(chartTimeLabel);
+        telemetryChart.data.datasets[0].data.push(tel.cpu_usage);
+        telemetryChart.data.datasets[1].data.push(tel.ram_usage);
+        telemetryChart.data.datasets[2].data.push(tel.gpu_usage);
+        
+        if (telemetryChart.data.labels.length > 30) {
+            telemetryChart.data.labels.shift();
+            telemetryChart.data.datasets.forEach(ds => ds.data.shift());
+        }
+        telemetryChart.update();
+        
+        if (moduleChart && analytics && analytics.module_usage) {
+            const labels = Object.keys(analytics.module_usage);
+            const data = Object.values(analytics.module_usage);
+            moduleChart.data.labels = labels;
+            moduleChart.data.datasets[0].data = data;
+            moduleChart.update();
+        }
     }
 
     function renderColorHistory(mdata) {
@@ -461,10 +664,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Initialize loops
-    setInterval(checkSystemStatus, 1000); // Polling faster to make history responsive
-    setInterval(updateMockPerformance, 2000);
+    setInterval(checkSystemStatus, 1000); 
     
     // Initial calls
     checkSystemStatus();
-    updateMockPerformance();
 });

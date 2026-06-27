@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Media Gallery - Pi Vision AI</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <style>
+        .gallery-item {
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            background: rgba(255,255,255,0.05);
+            border-radius: 10px;
+            overflow: hidden;
+            position: relative;
+        }
+        .gallery-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+        }
+        .gallery-icon {
+            font-size: 3rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 150px;
+            background: rgba(0,0,0,0.2);
+            color: var(--bs-primary);
+        }
+        .gallery-item img {
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+        }
+        .gallery-item .overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .gallery-item:hover .overlay {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="dark-theme">
+    <div class="container-fluid py-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="mb-0"><i class="fa-solid fa-images text-accent me-2"></i>Media Gallery</h2>
+            <a href="/" class="btn btn-outline-light"><i class="fa-solid fa-arrow-left me-2"></i>Back to Dashboard</a>
+        </div>
+        
+        <!-- Controls -->
+        <div class="glass-panel p-3 mb-4 d-flex gap-3 align-items-center">
+            <div class="input-group" style="max-width: 300px;">
+                <span class="input-group-text bg-dark border-secondary text-light"><i class="fa-solid fa-search"></i></span>
+                <input type="text" id="search-input" class="form-control bg-dark text-light border-secondary" placeholder="Search files...">
+            </div>
+            <select id="filter-select" class="form-select bg-dark text-light border-secondary" style="max-width: 200px;">
+                <option value="all">All Media</option>
+                <option value="image">Images</option>
+                <option value="video">Videos</option>
+                <option value="document">Reports</option>
+            </select>
+            <button class="btn btn-primary" onclick="loadGallery()"><i class="fa-solid fa-rotate-right"></i></button>
+        </div>
+        
+        <div class="row g-4" id="gallery-container">
+            <!-- Items injected by JS -->
+        </div>
+    </div>
+    
+    <!-- Modal -->
+    <div class="modal fade" id="previewModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content bg-dark text-light border-secondary">
+          <div class="modal-header border-secondary">
+            <h5 class="modal-title" id="previewTitle">Preview</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body text-center" id="previewBody">
+            <!-- Content -->
+          </div>
+          <div class="modal-footer border-secondary">
+            <a href="#" id="btnDownload" class="btn btn-success" download><i class="fa-solid fa-download me-2"></i>Download</a>
+            <button type="button" class="btn btn-danger" id="btnDelete"><i class="fa-solid fa-trash me-2"></i>Delete</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let filesData = [];
+        const container = document.getElementById('gallery-container');
+        const modal = new bootstrap.Modal(document.getElementById('previewModal'));
+        let currentFile = null;
+        
+        async function loadGallery() {
+            try {
+                const res = await fetch('/api/gallery/files');
+                const data = await res.json();
+                filesData = data.files;
+                renderGallery();
+            } catch (e) { console.error(e); }
+        }
+        
+        function renderGallery() {
+            const search = document.getElementById('search-input').value.toLowerCase();
+            const filter = document.getElementById('filter-select').value;
+            
+            container.innerHTML = '';
+            filesData.forEach(f => {
+                if (filter !== 'all' && f.category !== filter) return;
+                if (search && !f.name.toLowerCase().includes(search)) return;
+                
+                const col = document.createElement('div');
+                col.className = 'col-12 col-sm-6 col-md-4 col-lg-3 col-xl-2';
+                
+                let icon = 'fa-file';
+                if(f.category === 'image') icon = 'fa-image';
+                if(f.category === 'video') icon = 'fa-video';
+                if(f.category === 'document') icon = 'fa-file-lines';
+                
+                let preview = `<div class="gallery-icon"><i class="fa-solid ${icon}"></i></div>`;
+                if (f.category === 'image') {
+                    preview = `<img src="${f.path}" alt="${f.name}" loading="lazy">`;
+                }
+                
+                const sizeKb = (f.size / 1024).toFixed(1);
+                
+                col.innerHTML = `
+                    <div class="gallery-item h-100 d-flex flex-column" onclick='openPreview(${JSON.stringify(f)})'>
+                        ${preview}
+                        <div class="p-2 border-top border-secondary text-truncate small">
+                            ${f.name}<br>
+                            <span class="text-muted">${sizeKb} KB</span>
+                        </div>
+                        <div class="overlay">
+                            <button class="btn btn-primary rounded-circle"><i class="fa-solid fa-eye"></i></button>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(col);
+            });
+        }
+        
+        function openPreview(f) {
+            currentFile = f;
+            document.getElementById('previewTitle').innerText = f.name;
+            const body = document.getElementById('previewBody');
+            
+            if (f.category === 'image') {
+                body.innerHTML = `<img src="${f.path}" class="img-fluid rounded" style="max-height:70vh;object-fit:contain;">`;
+            } else if (f.category === 'video') {
+                body.innerHTML = `<video src="${f.path}" controls class="w-100 rounded" style="max-height:70vh;"></video>`;
+            } else {
+                body.innerHTML = `<i class="fa-solid fa-file-lines fa-5x text-muted mb-3"></i><h5>${f.name}</h5><p>Preview not available for this format.</p>`;
+            }
+            
+            document.getElementById('btnDownload').href = f.path;
+            
+            const btnDel = document.getElementById('btnDelete');
+            btnDel.onclick = async () => {
+                if(confirm("Delete this file?")) {
+                    await fetch('/api/gallery/delete', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({cat: f.category, file: f.name})
+                    });
+                    modal.hide();
+                    loadGallery();
+                }
+            };
+            
+            modal.show();
+        }
+        
+        document.getElementById('search-input').addEventListener('input', renderGallery);
+        document.getElementById('filter-select').addEventListener('change', renderGallery);
+        
+        // Init
+        loadGallery();
+    </script>
+</body>
+</html>

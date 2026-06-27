@@ -16,6 +16,9 @@
     
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body class="dark-theme">
 
@@ -32,13 +35,19 @@
                 <h6 class="section-title">Navigation</h6>
                 <ul class="nav flex-column">
                     <li class="nav-item">
-                        <a class="nav-link active" href="#"><i class="fa-solid fa-chart-line"></i> Dashboard</a>
+                        <a class="nav-link view-tab active" href="#" data-target="live-view"><i class="fa-solid fa-video"></i> <span data-i18n="live_stream">Live Stream</span></a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="#"><i class="fa-solid fa-video"></i> Recordings</a>
+                        <a class="nav-link view-tab" href="#" data-target="analytics-view"><i class="fa-solid fa-chart-pie"></i> <span data-i18n="analytics">Analytics</span></a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="#"><i class="fa-solid fa-gear"></i> Settings</a>
+                        <a class="nav-link view-tab" href="#" data-target="settings-view"><i class="fa-solid fa-sliders"></i> <span data-i18n="settings">Settings</span></a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/gallery"><i class="fa-solid fa-images"></i> <span data-i18n="media_gallery">Media Gallery</span></a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#shortcutsModal"><i class="fa-solid fa-keyboard"></i> <span>Shortcuts</span></a>
                     </li>
                 </ul>
             </div>
@@ -81,8 +90,10 @@
                 </div>
             </nav>
 
-            <!-- Dashboard Grid -->
-            <div class="dashboard-grid">
+            <!-- Live View -->
+            <div id="live-view" class="view-section h-100 d-flex flex-column">
+                <!-- Dashboard Grid -->
+                <div class="dashboard-grid">
                 
                 <!-- Main Camera View -->
                 <div class="camera-section glass-panel">
@@ -178,7 +189,101 @@
                     </div>
 
                 </div>
+            </div>
 
+            <!-- Analytics View -->
+            <div id="analytics-view" class="view-section h-100 d-none flex-column gap-4" style="overflow-y: auto;">
+                <div class="row g-4">
+                    <div class="col-md-3"><div class="glass-panel p-4 text-center"><h5 class="text-muted text-uppercase small">Objects Detected</h5><h2 class="text-accent fw-bold" id="stat-objects">0</h2></div></div>
+                    <div class="col-md-3"><div class="glass-panel p-4 text-center"><h5 class="text-muted text-uppercase small">OCR Reads</h5><h2 class="text-accent fw-bold" id="stat-ocr">0</h2></div></div>
+                    <div class="col-md-3"><div class="glass-panel p-4 text-center"><h5 class="text-muted text-uppercase small">Barcode Scans</h5><h2 class="text-accent fw-bold" id="stat-barcode">0</h2></div></div>
+                    <div class="col-md-3"><div class="glass-panel p-4 text-center"><h5 class="text-muted text-uppercase small">Avg Inference</h5><h2 class="text-accent fw-bold" id="stat-inf">0ms</h2></div></div>
+                </div>
+                <div class="row g-4">
+                    <div class="col-md-3"><div class="glass-panel p-4 text-center"><h5 class="text-muted text-uppercase small">Network RX</h5><h4 class="fw-bold" id="stat-net-rx">0.0 Mbps</h4></div></div>
+                    <div class="col-md-3"><div class="glass-panel p-4 text-center"><h5 class="text-muted text-uppercase small">Network TX</h5><h4 class="fw-bold" id="stat-net-tx">0.0 Mbps</h4></div></div>
+                    <div class="col-md-3"><div class="glass-panel p-4 text-center"><h5 class="text-muted text-uppercase small">Disk Usage</h5><h4 class="fw-bold" id="stat-disk">0%</h4></div></div>
+                    <div class="col-md-3"><div class="glass-panel p-4 text-center"><h5 class="text-muted text-uppercase small">Uptime</h5><h4 class="fw-bold" id="stat-uptime">0s</h4></div></div>
+                </div>
+                <div class="row g-4 flex-grow-1" style="min-height: 400px;">
+                    <div class="col-md-8">
+                        <div class="glass-panel h-100 p-4 d-flex flex-column">
+                            <h5 class="mb-3">Hardware Telemetry</h5>
+                            <div class="flex-grow-1 position-relative">
+                                <canvas id="telemetryChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="glass-panel h-100 p-4 d-flex flex-column">
+                            <h5 class="mb-3">Module Usage</h5>
+                            <div class="flex-grow-1 position-relative">
+                                <canvas id="moduleChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings View -->
+            <div id="settings-view" class="view-section h-100 d-none" style="overflow-y: auto;">
+                <div class="glass-panel p-4 mx-auto" style="max-width: 800px;">
+                    <h4 class="mb-4"><i class="fa-solid fa-gear me-2"></i> Console Settings</h4>
+                    <form id="consoleSettingsForm">
+                        <div class="row g-4">
+                            <div class="col-md-6">
+                                <label class="form-label text-muted small text-uppercase">Theme</label>
+                                <select class="form-select bg-dark text-light border-secondary" id="setTheme">
+                                    <option value="dark-theme">Dark Mode</option>
+                                    <option value="light-theme">Light Mode</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label text-muted small text-uppercase">Language</label>
+                                <select class="form-select bg-dark text-light border-secondary" id="setLang">
+                                    <option value="en">English</option>
+                                    <option value="es">Español (Future)</option>
+                                </select>
+                            </div>
+                            
+                            <div class="col-12"><hr class="border-secondary"></div>
+                            <h5 class="mb-2">Media & Export</h5>
+                            <div class="col-md-6">
+                                <label class="form-label text-muted small text-uppercase">Source Feed</label>
+                                <select class="form-select bg-dark text-light border-secondary" id="mediaFeed">
+                                    <option value="Processed Feed">Processed Feed (With Graphics)</option>
+                                    <option value="Original Feed">Original Feed (Raw Camera)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label text-muted small text-uppercase">Screenshot Format</label>
+                                <select class="form-select bg-dark text-light border-secondary" id="screenshotFormat">
+                                    <option value="PNG">PNG</option>
+                                    <option value="JPEG">JPEG</option>
+                                    <option value="WEBP">WEBP</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label text-muted small text-uppercase">Video Codec</label>
+                                <select class="form-select bg-dark text-light border-secondary" id="videoCodec">
+                                    <option value="H264">H264 (MP4)</option>
+                                    <option value="XVID">XVID (AVI)</option>
+                                    <option value="MJPEG">MJPEG (AVI)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label text-muted small text-uppercase">Export Format</label>
+                                <select class="form-select bg-dark text-light border-secondary" id="exportFormat">
+                                    <option value="CSV">CSV</option>
+                                    <option value="JSON">JSON</option>
+                                    <option value="TXT">TXT</option>
+                                    <option value="Excel (.xlsx)">Excel (.xlsx)</option>
+                                    <option value="PDF Report">PDF Report</option>
+                                </select>
+                            </div>
+                        </div>
+                    </form>
+                </div>
             </div>
         </main>
     </div>
@@ -193,6 +298,34 @@
                 <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
             </div>
         </div>
+    </div>
+
+    <!-- Shortcuts Modal -->
+    <div class="modal fade" id="shortcutsModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark text-light border-secondary">
+          <div class="modal-header border-secondary">
+            <h5 class="modal-title"><i class="fa-solid fa-keyboard me-2"></i> Keyboard Shortcuts</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <ul class="list-group list-group-flush bg-transparent">
+              <li class="list-group-item bg-transparent text-light d-flex justify-content-between align-items-center border-secondary">
+                Take Screenshot <kbd class="bg-secondary text-light">S</kbd>
+              </li>
+              <li class="list-group-item bg-transparent text-light d-flex justify-content-between align-items-center border-secondary">
+                Start Recording <kbd class="bg-secondary text-light">R</kbd>
+              </li>
+              <li class="list-group-item bg-transparent text-light d-flex justify-content-between align-items-center border-secondary">
+                Stop Recording <kbd class="bg-secondary text-light">ESC</kbd>
+              </li>
+              <li class="list-group-item bg-transparent text-light d-flex justify-content-between align-items-center border-secondary">
+                Toggle Module 1-5 <kbd class="bg-secondary text-light">CTRL + 1-5</kbd>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Scripts -->

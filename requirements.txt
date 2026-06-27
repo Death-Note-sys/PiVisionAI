@@ -3,3 +3,10 @@ opencv-python-headless>=4.10.0.0
 ultralytics
 webcolors
 easyocr
+mediapipe
+pyzbar
+pandas
+openpyxl
+reportlab
+psutil
+WMI

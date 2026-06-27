@@ -20,13 +20,26 @@
 }
 
 /* Global Styles */
-body.dark-theme {
+body {
     margin: 0;
     padding: 0;
     background-color: var(--bg-base);
     color: var(--text-primary);
     font-family: 'Inter', sans-serif;
     overflow: hidden; /* App-like feel */
+    transition: background-color 0.3s, color 0.3s;
+}
+
+body.light-theme {
+    --bg-base: #f1f5f9;
+    --bg-panel: rgba(255, 255, 255, 0.8);
+    --bg-panel-heavy: rgba(255, 255, 255, 0.95);
+    
+    --text-primary: #1e293b;
+    --text-secondary: #475569;
+    
+    --border-glass: rgba(0, 0, 0, 0.1);
+    --border-glass-light: rgba(0, 0, 0, 0.15);
 }
 
 /* Typography & Utilities */
@@ -105,12 +118,12 @@ body.dark-theme {
 
 .nav-link:hover, .nav-link.active {
     color: var(--text-primary);
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--border-glass-light);
 }
 
 .nav-link.active {
     border-left: 3px solid var(--accent);
-    background: rgba(59, 130, 246, 0.1);
+    background: rgba(59, 130, 246, 0.15);
 }
 
 /* Modules List Specific */
@@ -177,7 +190,7 @@ body.dark-theme {
 .camera-header {
     padding: 16px 24px;
     border-bottom: 1px solid var(--border-glass);
-    background: rgba(0, 0, 0, 0.2);
+    background: var(--border-glass);
 }
 
 .camera-container {
@@ -263,7 +276,7 @@ body.dark-theme {
 .panel-header {
     padding: 16px 20px;
     border-bottom: 1px solid var(--border-glass);
-    background: rgba(0, 0, 0, 0.2);
+    background: var(--border-glass);
 }
 
 .performance-panel, .status-panel {
@@ -320,8 +333,8 @@ body.dark-theme {
     gap: 10px;
     padding: 10px 16px;
     border-radius: 50px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid var(--border-glass);
+    background: var(--border-glass);
+    border: 1px solid var(--border-glass-light);
     font-size: 0.9rem;
     font-weight: 500;
 }

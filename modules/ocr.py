@@ -9,51 +9,32 @@ class OCRDetector(BaseVisionModule):
         print("[OCRDetector] Initializing resources...")
         import easyocr
         # Load EasyOCR model into memory only when module is active
-        # gpu=False to optimize for Raspberry Pi constraints (though it may still be slow)
-        self.reader = easyocr.Reader(['en'], gpu=False)
+        # gpu=True since we are now optimized for Desktop
+        self.reader = easyocr.Reader(['en'], gpu=True)
         self.history = []
         self.export_format = "CSV"
-        
-        self.last_ocr_time = 0
-        self.ocr_interval = 2.0  # Run OCR once every 2 seconds to maintain frame rate
-        
-        self.latest_results = []
 
     def process(self, frame):
-        current_time = time.time()
+        # Run deep learning OCR on every frame (will drop framerate on weak CPUs but perfectly sticks to text)
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        results = self.reader.readtext(gray)
         
-        # Only run deep learning OCR periodically to avoid completely blocking the video feed
-        if current_time - self.last_ocr_time > self.ocr_interval:
-            self.last_ocr_time = current_time
-            # Run inference
-            # We convert to grayscale for faster processing
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            results = self.reader.readtext(gray)
-            
-            self.latest_results = results
-            
-            # Store in history
-            for (bbox, text, prob) in results:
-                if prob > 0.3:  # Only save reasonably confident detections
-                    # check if not already recently added
-                    if not any(h['text'] == text for h in self.history[-10:]):
-                        self.history.append({
-                            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-                            "text": text,
-                            "confidence": round(float(prob), 3)
-                        })
-
-        # Draw the latest results continuously so they don't flicker between OCR runs
-        for (bbox, text, prob) in self.latest_results:
-            if prob > 0.3:
+        for (bbox, text, prob) in results:
+            if prob > 0.3:  # Only save reasonably confident detections
+                # check if not already recently added
+                if not any(h['text'] == text for h in self.history[-10:]):
+                    self.history.append({
+                        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                        "text": text,
+                        "confidence": round(float(prob), 3)
+                    })
+                    
+                # Draw bounding box and text
                 (tl, tr, br, bl) = bbox
                 tl = (int(tl[0]), int(tl[1]))
                 br = (int(br[0]), int(br[1]))
                 
-                # Draw bounding box
                 cv2.rectangle(frame, tl, br, (0, 255, 0), 2)
-                
-                # Draw text and confidence
                 display_text = f"{text} ({prob:.2f})"
                 cv2.putText(frame, display_text, (tl[0], tl[1] - 10),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
@@ -103,7 +84,6 @@ class OCRDetector(BaseVisionModule):
         print("[OCRDetector] Cleaning up resources. Unloading model...")
         self.reader = None
         self.history = []
-        self.latest_results = []
         # Force garbage collection to free up memory from PyTorch models
         gc.collect()
 
