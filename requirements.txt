@@ -10,3 +10,11 @@ openpyxl
 reportlab
 psutil
 WMI
+pydantic>=2.0.0
+onnxruntime
+onnxruntime-directml
+Flask-Limiter
+Flask-Cors
+python-dotenv
+click
+pytest

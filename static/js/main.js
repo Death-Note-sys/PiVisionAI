@@ -63,12 +63,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Initial Fetch of Modules ---
     async function fetchModules() {
         try {
-            const res = await fetch('/api/modules');
-            availableModulesData = await res.json();
+            const res = await fetch('/api/v1/modules/');
+            const data = await res.json();
+            availableModulesData = data.modules || [];
             
             // Highlight active if any
-            const activeMod = availableModulesData.find(m => m.is_active);
-            if (activeMod) {
+            const activeRes = await fetch('/api/v1/modules/active');
+            const activeMod = await activeRes.json();
+            if (activeMod && activeMod.id) {
                 activateUIForModule(activeMod.id, activeMod);
             }
         } catch (e) {
@@ -103,10 +105,10 @@ document.addEventListener('DOMContentLoaded', () => {
     cameraSelector.addEventListener('change', async (e) => {
         const index = e.target.value;
         try {
-            await fetch('/api/cameras/switch', {
+            await fetch('/api/v1/camera/switch', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ index: parseInt(index) })
+                body: JSON.stringify({ index: parseInt(index), resolution: "1280x720" })
             });
             showToast(`Switching to Camera ${index}...`, 'info');
         } catch(err) {
@@ -164,10 +166,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             try {
-                const res = await fetch('/api/modules/activate', {
+                const res = await fetch('/api/v1/modules/switch', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ module: targetModule })
+                    body: JSON.stringify({ module_id: targetModule })
                 });
                 if(res.ok) {
                     if (targetModule === "") {
@@ -264,7 +266,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const payload = {};
                     payload[key] = e.target.value;
                     try {
-                        await fetch('/api/modules/settings', {
+                        await fetch('/api/v1/modules/settings', {
                             method: 'POST',
                             headers: {'Content-Type': 'application/json'},
                             body: JSON.stringify(payload)
@@ -295,7 +297,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const payload = {};
                     payload[key] = e.target.value;
                     try {
-                        await fetch('/api/modules/settings', {
+                        await fetch('/api/v1/modules/settings', {
                             method: 'POST',
                             headers: {'Content-Type': 'application/json'},
                             body: JSON.stringify(payload)
@@ -442,7 +444,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (isRecording) btnStopRecord.click();
         } else if (e.ctrlKey && e.key >= '1' && e.key <= '5') {
             e.preventDefault();
-            const mods = [null, 'object-detection', 'measurement', 'ocr', 'color-detector', 'face-detection'];
+            const mods = [null, 'core-yolo-detection', 'core-measurement', 'core-ocr-scanner', 'core-color-detector', 'core-face-detection'];
             const modId = mods[parseInt(e.key)];
             if (modId) {
                 const link = Array.from(moduleLinks).find(l => l.getAttribute('data-module') === modId);
@@ -473,7 +475,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function checkSystemStatus() {
         try {
             // Fetch real backend status
-            const response = await fetch('/api/status');
+            const response = await fetch('/api/v1/system/status');
             const data = await response.json();
 
             if (data.status === 'running') {
@@ -481,20 +483,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 globalStatus.classList.add('online');
                 globalStatus.querySelector('.status-text').textContent = 'System Online';
                 
-                if (data.camera_active) {
+                if (data.camera && data.camera.is_connected) {
                     offlinePlaceholder.style.display = 'none';
                     if (cameraFeed.style.display === 'none' || !cameraFeed.src.includes('?')) {
-                        cameraFeed.src = "/video_feed?t=" + new Date().getTime();
+                        cameraFeed.src = "/api/v1/camera/stream?t=" + new Date().getTime();
                     }
                     cameraFeed.style.display = 'block';
                     camStatusBadge.textContent = 'Live';
                     camStatusBadge.className = 'badge bg-success';
                     
                     // Update Camera Header Text with Resolution
-                    cameraTitleText.textContent = `Cam ${data.camera_index} (${data.resolution})`;
+                    cameraTitleText.textContent = `Cam ${data.camera.index}`;
                     
                     // Update Real FPS
-                    metricFps.textContent = data.fps;
+                    metricFps.textContent = data.camera.fps;
                     
                     // Handle dynamic module data like color history
                     if (data.module_metadata && data.module_metadata.module_data) {
@@ -513,28 +515,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 
                 // Real Telemetry
-                if (data.telemetry) {
-                    const tel = data.telemetry;
-                    metricCpu.textContent = `${tel.cpu_usage}%`;
-                    barCpu.style.width = `${tel.cpu_usage}%`;
-                    if(tel.cpu_usage > 80) barCpu.className = 'progress-bar bg-danger';
-                    else if(tel.cpu_usage > 50) barCpu.className = 'progress-bar bg-warning';
+                if (data.performance) {
+                    const tel = data.performance;
+                    metricCpu.textContent = `${tel.cpu_usage_percent}%`;
+                    barCpu.style.width = `${tel.cpu_usage_percent}%`;
+                    if(tel.cpu_usage_percent > 80) barCpu.className = 'progress-bar bg-danger';
+                    else if(tel.cpu_usage_percent > 50) barCpu.className = 'progress-bar bg-warning';
                     else barCpu.className = 'progress-bar bg-accent';
                     
-                    const memPct = Math.round((tel.ram_usage / (tel.ram_total || 1)) * 100);
-                    metricMem.textContent = `${tel.ram_usage} GB / ${tel.ram_total} GB`;
+                    const memPct = Math.round((tel.ram_usage_gb / (tel.ram_total_gb || 1)) * 100);
+                    metricMem.textContent = `${tel.ram_usage_gb} GB / ${tel.ram_total_gb} GB`;
                     barMem.style.width = `${memPct}%`;
                     
-                    document.getElementById('stat-net-rx').textContent = `${tel.net_speed_rx} Mbps`;
-                    document.getElementById('stat-net-tx').textContent = `${tel.net_speed_tx} Mbps`;
+                    document.getElementById('stat-net-rx').textContent = `${tel.net_rx_mbps} Mbps`;
+                    document.getElementById('stat-net-tx').textContent = `${tel.net_tx_mbps} Mbps`;
                     
-                    const diskPct = Math.round((tel.disk_usage / (tel.disk_total || 1)) * 100);
-                    document.getElementById('stat-disk').textContent = `${diskPct}%`;
+                    document.getElementById('stat-disk').textContent = `${tel.disk_usage_percent}%`;
                     
                     // Format Uptime
-                    let upStr = `${tel.uptime}s`;
-                    if(tel.uptime > 60) upStr = `${Math.floor(tel.uptime/60)}m ${tel.uptime%60}s`;
-                    if(tel.uptime > 3600) upStr = `${Math.floor(tel.uptime/3600)}h ${Math.floor((tel.uptime%3600)/60)}m`;
+                    let upStr = `${tel.uptime_seconds}s`;
+                    if(tel.uptime_seconds > 60) upStr = `${Math.floor(tel.uptime_seconds/60)}m ${tel.uptime_seconds%60}s`;
+                    if(tel.uptime_seconds > 3600) upStr = `${Math.floor(tel.uptime_seconds/3600)}h ${Math.floor((tel.uptime_seconds%3600)/60)}m`;
                     document.getElementById('stat-uptime').textContent = upStr;
                     
                     updateCharts(tel, data.analytics);
@@ -605,9 +606,9 @@ document.addEventListener('DOMContentLoaded', () => {
         
         chartTimeLabel++;
         telemetryChart.data.labels.push(chartTimeLabel);
-        telemetryChart.data.datasets[0].data.push(tel.cpu_usage);
-        telemetryChart.data.datasets[1].data.push(tel.ram_usage);
-        telemetryChart.data.datasets[2].data.push(tel.gpu_usage);
+        telemetryChart.data.datasets[0].data.push(tel.cpu_usage_percent);
+        telemetryChart.data.datasets[1].data.push(tel.ram_usage_gb);
+        telemetryChart.data.datasets[2].data.push(tel.gpu_usage_percent);
         
         if (telemetryChart.data.labels.length > 30) {
             telemetryChart.data.labels.shift();

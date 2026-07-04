@@ -1,0 +1,12 @@
+{
+    "id": "core-color-detector",
+    "name": "Color Detector",
+    "version": "1.0.0",
+    "author": "Pi Vision AI Core",
+    "description": "Calculates dominant frame color. Supports clicking on the frame to sample colors.",
+    "dependencies": ["opencv-python", "webcolors"],
+    "supported_tasks": ["COLOR"],
+    "required_models": [],
+    "entry_point": "color_module.py:ColorDetectorModule",
+    "settings": {}
+}

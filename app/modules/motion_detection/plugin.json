@@ -1,0 +1,25 @@
+{
+    "id": "core-motion-detection",
+    "name": "Motion Detection",
+    "version": "1.0.0",
+    "author": "Pi Vision AI Core",
+    "description": "Background subtraction based motion tracking using MOG2 and KNN.",
+    "dependencies": ["opencv-python"],
+    "supported_tasks": ["MOTION"],
+    "required_models": [],
+    "entry_point": "motion_module.py:MotionDetectionModule",
+    "settings": {
+        "algorithm": {
+            "type": "select",
+            "options": ["MOG2", "KNN"],
+            "default": "MOG2"
+        },
+        "sensitivity": {
+            "type": "slider",
+            "min": 100,
+            "max": 5000,
+            "step": 100,
+            "default": 500
+        }
+    }
+}

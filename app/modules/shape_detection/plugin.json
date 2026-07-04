@@ -1,0 +1,20 @@
+{
+    "id": "core-shape-detection",
+    "name": "Shape Detection",
+    "version": "1.0.0",
+    "author": "Pi Vision AI Core",
+    "description": "Detects geometric shapes and calculates area and perimeter.",
+    "dependencies": ["opencv-python", "numpy"],
+    "supported_tasks": ["Geometry"],
+    "required_models": [],
+    "entry_point": "shape_module.py:ShapeDetectionModule",
+    "settings": {
+        "min_contour_area": {
+            "type": "slider",
+            "min": 100,
+            "max": 10000,
+            "step": 100,
+            "default": 1000
+        }
+    }
+}

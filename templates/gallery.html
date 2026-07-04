@@ -105,7 +105,7 @@
         
         async function loadGallery() {
             try {
-                const res = await fetch('/api/gallery/files');
+                const res = await fetch('/api/v1/gallery/files');
                 const data = await res.json();
                 filesData = data.files;
                 renderGallery();
@@ -170,7 +170,7 @@
             const btnDel = document.getElementById('btnDelete');
             btnDel.onclick = async () => {
                 if(confirm("Delete this file?")) {
-                    await fetch('/api/gallery/delete', {
+                    await fetch('/api/v1/gallery/delete', {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
                         body: JSON.stringify({cat: f.category, file: f.name})

@@ -1,0 +1,18 @@
+{
+    "id": "core-ocr-scanner",
+    "name": "OCR Text Scanner",
+    "version": "1.0.0",
+    "author": "Pi Vision AI Core",
+    "description": "Scans for text and numbers using EasyOCR deep learning.",
+    "dependencies": ["easyocr"],
+    "supported_tasks": ["OCR"],
+    "required_models": [],
+    "entry_point": "ocr_module.py:OCRScannerModule",
+    "settings": {
+        "export_format": {
+            "type": "select",
+            "options": ["CSV", "JSON", "TXT"],
+            "default": "CSV"
+        }
+    }
+}

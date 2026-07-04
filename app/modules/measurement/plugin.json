@@ -1,0 +1,12 @@
+{
+    "id": "core-measurement",
+    "name": "Measurement",
+    "version": "1.0.0",
+    "author": "Pi Vision AI Core",
+    "description": "Measures distance between two points using an A4 paper reference.",
+    "dependencies": ["opencv-python", "numpy"],
+    "supported_tasks": ["Measurement"],
+    "required_models": [],
+    "entry_point": "measurement_module.py:MeasurementModule",
+    "settings": {}
+}

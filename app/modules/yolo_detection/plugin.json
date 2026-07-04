@@ -1,0 +1,11 @@
+{
+    "id": "core-yolo-detection",
+    "name": "YOLO Object Detection",
+    "version": "1.0.0",
+    "author": "Pi Vision AI Core",
+    "description": "General purpose object detection using the YOLO family of models.",
+    "dependencies": ["ultralytics"],
+    "supported_tasks": ["Object Detection"],
+    "required_models": ["yolo11n"],
+    "entry_point": "yolo_module.py:YOLODetectionModule"
+}

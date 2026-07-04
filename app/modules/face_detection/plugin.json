@@ -1,0 +1,20 @@
+{
+    "id": "core-face-detection",
+    "name": "Face Detection",
+    "version": "1.0.0",
+    "author": "Pi Vision AI Core",
+    "description": "MediaPipe Face Detection & Mesh (Tasks API).",
+    "dependencies": ["mediapipe", "opencv-python"],
+    "supported_tasks": ["FACE"],
+    "required_models": ["blaze_face_short_range.tflite", "face_landmarker.task"],
+    "entry_point": "face_module.py:FaceDetectionModule",
+    "settings": {
+        "enable_face_mesh": {
+            "type": "slider",
+            "min": 0,
+            "max": 1,
+            "step": 1,
+            "default": 0
+        }
+    }
+}

@@ -1,0 +1,18 @@
+{
+    "id": "core-background-removal",
+    "name": "Background Removal",
+    "version": "1.0.0",
+    "author": "Pi Vision AI Core",
+    "description": "MediaPipe Selfie Segmentation (Tasks API).",
+    "dependencies": ["mediapipe", "opencv-python"],
+    "supported_tasks": ["Segmentation"],
+    "required_models": ["selfie_segmenter.tflite"],
+    "entry_point": "background_module.py:BackgroundRemovalModule",
+    "settings": {
+        "mode": {
+            "type": "select",
+            "options": ["Blur", "Solid Color", "Transparent", "Custom Image"],
+            "default": "Blur"
+        }
+    }
+}

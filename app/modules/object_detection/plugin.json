@@ -1,0 +1,27 @@
+{
+    "id": "core-object-detection",
+    "name": "Object Detection",
+    "version": "1.0.0",
+    "author": "Pi Vision AI Core",
+    "description": "Production-grade object detection using universal Model Registry.",
+    "category": "Vision",
+    "task": "Object Detection",
+    "entry_point": "plugin.py:ObjectDetectionPlugin",
+    "renderer": "detection",
+    "api_version": "v1",
+    "supported_camera_types": ["rgb"],
+    "supported_results": ["DetectionResult"],
+    "required_models": [],
+    "required_backends": ["CPUExecutionProvider"],
+    "optional_backends": ["CUDAExecutionProvider"],
+    "permissions": ["camera", "file_system"],
+    "dependencies": ["ultralytics", "numpy"],
+    "minimum_framework_version": "1.0.0",
+    "license": "MIT",
+    "settings_schema": {
+        "confidence": {"type": "float", "default": 0.5},
+        "iou": {"type": "float", "default": 0.45},
+        "show_labels": {"type": "boolean", "default": true},
+        "show_conf": {"type": "boolean", "default": true}
+    }
+}

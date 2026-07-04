@@ -1,0 +1,25 @@
+{
+    "id": "core-barcode-scanner",
+    "name": "Barcode & QR Scanner",
+    "version": "1.0.0",
+    "author": "Pi Vision AI Core",
+    "description": "Scans multiple 1D and 2D barcode formats using pyzbar.",
+    "dependencies": ["pyzbar"],
+    "supported_tasks": ["BARCODE"],
+    "required_models": [],
+    "entry_point": "barcode_module.py:BarcodeScannerModule",
+    "settings": {
+        "export_format": {
+            "type": "select",
+            "options": ["CSV", "JSON", "TXT"],
+            "default": "CSV"
+        },
+        "duplicate_timeout": {
+            "type": "slider",
+            "min": 0,
+            "max": 10,
+            "step": 1,
+            "default": 2.0
+        }
+    }
+}
