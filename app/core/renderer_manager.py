@@ -2,6 +2,8 @@ import logging
 from typing import Dict, Any, Optional
 from app.core.contracts import IRenderer
 from app.core.renderers.detection_renderer import DetectionRenderer
+from app.core.renderers.measurement_renderer import MeasurementRenderer
+from app.core.renderers.ocr_renderer import OCRRenderer
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +17,8 @@ class RendererManager:
         
     def _register_default_renderers(self):
         self.renderers["detection"] = DetectionRenderer()
+        self.renderers["measurement"] = MeasurementRenderer()
+        self.renderers["ocr"] = OCRRenderer()
         # Other renderers can be registered dynamically
         
     def switch_renderer(self, renderer_name: str) -> bool:

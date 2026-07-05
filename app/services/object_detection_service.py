@@ -1,7 +1,10 @@
 import logging
+from typing import Dict, Any, Optional
 from app.core.container import Container
 
 logger = logging.getLogger(__name__)
+
+OBJECT_DETECTION_MODULE_ID = "core-object-detection"
 
 class ObjectDetectionService:
     def __init__(self):
@@ -33,10 +36,12 @@ class ObjectDetectionService:
         svc = self.container.module_controller.get_active_service()
         return svc.resume() if svc else False
         
-    def get_status(self) -> dict:
-        self._ensure_active()
-        svc = self.container.module_controller.get_active_service()
-        return svc.get_status() if svc else {}
+    def get_status(self) -> Optional[Dict[str, Any]]:
+        controller = self.container.module_controller
+        if not controller.active_metadata or controller.active_metadata.id != OBJECT_DETECTION_MODULE_ID:
+            return None
+        service = controller.get_active_service()
+        return service.get_status() if service else None
         
     def update_settings(self, settings: dict) -> bool:
         self._ensure_active()

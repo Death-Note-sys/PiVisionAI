@@ -3,10 +3,27 @@
     "name": "Measurement",
     "version": "1.0.0",
     "author": "Pi Vision AI Core",
-    "description": "Measures distance between two points using an A4 paper reference.",
-    "dependencies": ["opencv-python", "numpy"],
-    "supported_tasks": ["Measurement"],
+    "description": "Classical CV dimension inspection using contour detection and manual pixel-to-cm calibration.",
+    "category": "Vision",
+    "task": "Measurement",
+    "entry_point": "plugin.py:MeasurementPlugin",
+    "renderer": "measurement",
+    "api_version": "v1",
+    "supported_camera_types": ["rgb"],
+    "supported_results": ["MeasurementResult"],
     "required_models": [],
-    "entry_point": "measurement_module.py:MeasurementModule",
-    "settings": {}
+    "required_backends": [],
+    "optional_backends": [],
+    "permissions": ["camera"],
+    "dependencies": ["opencv-python", "numpy"],
+    "minimum_framework_version": "1.0.0",
+    "license": "MIT",
+    "settings_schema": {
+        "canny_low": {"type": "integer", "default": 50},
+        "canny_high": {"type": "integer", "default": 150},
+        "min_contour_area": {"type": "float", "default": 500.0},
+        "show_contours": {"type": "boolean", "default": true},
+        "show_dimensions": {"type": "boolean", "default": true},
+        "unit": {"type": "string", "default": "cm"}
+    }
 }

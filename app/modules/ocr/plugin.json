@@ -1,0 +1,26 @@
+{
+    "id": "core-ocr",
+    "name": "OCR",
+    "version": "1.0.0",
+    "author": "Pi Vision AI Core",
+    "description": "Text detection and recognition using EasyOCR.",
+    "category": "Vision",
+    "task": "OCR",
+    "entry_point": "plugin.py:OCRPlugin",
+    "renderer": "ocr",
+    "api_version": "v1",
+    "supported_camera_types": ["rgb"],
+    "supported_results": ["OCRResult"],
+    "required_models": ["easyocr"],
+    "required_backends": ["CPUExecutionProvider"],
+    "optional_backends": ["CUDAExecutionProvider"],
+    "permissions": ["camera"],
+    "dependencies": ["easyocr"],
+    "minimum_framework_version": "1.0.0",
+    "license": "MIT",
+    "settings_schema": {
+        "min_confidence": {"type": "float", "default": 0.3},
+        "show_text": {"type": "boolean", "default": true},
+        "show_confidence": {"type": "boolean", "default": true}
+    }
+}

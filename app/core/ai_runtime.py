@@ -8,6 +8,7 @@ from app.core.model_registry import ModelRegistry
 from app.core.models.system import AIBackend
 from app.core.contracts import IAdapter
 from app.core.adapters.yolo_adapter import YoloAdapter
+from app.core.adapters.ocr_adapter import OcrAdapter
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +58,8 @@ class AIRuntimeManager:
         adapter = None
         if meta.framework == "ultralytics":
             adapter = YoloAdapter()
+        elif meta.framework == "easyocr":
+            adapter = OcrAdapter()
         else:
             logger.error(f"Unsupported framework: {meta.framework}")
             return False
@@ -70,7 +73,12 @@ class AIRuntimeManager:
             # Fallback for built-in models
             model_path = meta.name
             
-        success = adapter.load_model(model_path, {})
+        try:
+            success = adapter.load_model(model_path, meta.custom_metadata or {})
+        except Exception as e:
+            logger.error(f"Failed to load model {model_id}: {e}")
+            return False
+            
         if success:
             self._loaded_adapters[model_id] = adapter
             self.event_bus.publish("ModelLoaded", {"model_id": model_id})

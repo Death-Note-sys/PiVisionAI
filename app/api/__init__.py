@@ -10,6 +10,8 @@ from .v1.camera import bp as camera_bp
 from .v1.modules import bp as modules_bp
 from .v1.gallery import bp as gallery_bp
 from .v1.object_detection import bp as object_detection_bp
+from .v1.measurement import bp as measurement_bp
+from .v1.ocr import bp as ocr_bp
 
 logger = logging.getLogger(__name__)
 
@@ -38,8 +40,12 @@ def create_app() -> Flask:
     app.register_blueprint(modules_bp)
     app.register_blueprint(gallery_bp)
     app.register_blueprint(object_detection_bp)
+    app.register_blueprint(measurement_bp)
+    app.register_blueprint(ocr_bp)
     
     limiter.exempt(object_detection_bp)
+    limiter.exempt(measurement_bp)
+    limiter.exempt(ocr_bp)
     
     @app.route('/')
     def index():

@@ -1,0 +1,24 @@
+{
+    "id": "easyocr",
+    "name": "easyocr",
+    "version": "1.0.0",
+    "framework": "easyocr",
+    "task": "ocr",
+    "format": "",
+    "input_size": [],
+    "output_format": "polygon",
+    "classes": [],
+    "backend": "CPUExecutionProvider",
+    "precision": "FP32",
+    "license": "Apache-2.0",
+    "author": "JaidedAI",
+    "description": "EasyOCR text detection and recognition, auto-downloaded on first load.",
+    "supported_backends": ["CPUExecutionProvider", "CUDAExecutionProvider"],
+    "recommended_backend": "CPUExecutionProvider",
+    "metrics": {},
+    "hardware_requirements": {},
+    "custom_metadata": {
+        "languages": ["en"],
+        "gpu": false
+    }
+}

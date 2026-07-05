@@ -1,0 +1,8 @@
+{
+    "id": "yolo11n",
+    "name": "yolo11n",
+    "version": "1.0",
+    "framework": "ultralytics",
+    "task": "object_detection",
+    "format": "pt"
+}

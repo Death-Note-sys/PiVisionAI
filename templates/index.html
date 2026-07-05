@@ -38,15 +38,21 @@
     flex-direction: column;
   }
 
+  .hidden { display: none !important; }
+
+  /* ---------- Top toolbar ---------- */
   .toolbar {
-    height: 48px;
+    min-height: 48px;
     flex-shrink: 0;
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    padding: 0 16px;
+    padding: 8px 16px;
     background: var(--panel);
     border-bottom: 1px solid var(--hairline);
-    gap: 20px;
+    gap: 12px;
+    position: relative;
+    z-index: 100;
   }
 
   .brand {
@@ -98,12 +104,14 @@
     background: var(--ok);
   }
 
+  /* ---------- Main layout ---------- */
   .main {
     flex: 1;
     display: flex;
     min-height: 0;
   }
 
+  /* Tool sidebar */
   .tool-rail {
     width: 56px;
     flex-shrink: 0;
@@ -146,6 +154,7 @@
     color: var(--text-primary);
   }
 
+  /* Camera viewport */
   .viewport-area {
     flex: 1;
     display: flex;
@@ -163,7 +172,7 @@
   .viewport-frame {
     position: relative;
     width: min(90%, 960px);
-    aspect-ratio: 4 / 3;
+    aspect-ratio: 16 / 9;
     background: #000;
     overflow: hidden;
   }
@@ -173,8 +182,16 @@
     inset: 0;
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: contain;
     display: block;
+  }
+
+  #calibrationCanvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    cursor: crosshair;
   }
 
   .viewport-placeholder {
@@ -192,6 +209,7 @@
 
   .viewport-placeholder i { font-size: 32px; }
 
+  /* Reticle corners - signature element */
   .reticle {
     position: absolute;
     width: 24px;
@@ -228,6 +246,7 @@
     transform: translateX(-50%);
     display: flex;
     gap: 8px;
+    z-index: 5;
   }
 
   .vp-btn {
@@ -248,6 +267,34 @@
   .vp-btn.primary { border-color: var(--cyan); color: var(--cyan); }
   .vp-btn:hover { background: var(--panel-raised); }
 
+  /* Calibration input overlay */
+  .calibration-panel {
+    position: absolute;
+    top: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(20, 24, 29, 0.95);
+    border: 1px solid var(--cyan);
+    border-radius: 6px;
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    z-index: 6;
+  }
+
+  .calibration-panel input[type="number"] {
+    width: 70px;
+    background: var(--panel-raised);
+    border: 1px solid var(--hairline);
+    color: var(--text-primary);
+    font-family: var(--font-data);
+    padding: 5px 8px;
+    border-radius: 4px;
+  }
+
+  /* Inspector panel */
   .inspector {
     width: 280px;
     flex-shrink: 0;
@@ -283,6 +330,8 @@
   .stat-row .label { color: var(--text-muted); }
   .stat-row .value { font-family: var(--font-data); color: var(--text-primary); }
   .stat-row .value.accent { color: var(--cyan); }
+  .stat-row .value.ok { color: var(--ok); }
+  .stat-row .value.warn { color: var(--ng); }
 
   .field { margin-bottom: 14px; }
 
@@ -303,6 +352,17 @@
     width: 100%;
     accent-color: var(--cyan);
     background: transparent;
+  }
+
+  select.inline-select {
+    width: 100%;
+    background: var(--panel-raised);
+    border: 1px solid var(--hairline);
+    color: var(--text-primary);
+    font-family: var(--font-ui);
+    font-size: 12px;
+    padding: 6px 8px;
+    border-radius: 4px;
   }
 
   .toggle-row {
@@ -334,6 +394,22 @@
   }
   .switch.on::after { transform: translateX(14px); }
 
+  .full-btn {
+    width: 100%;
+    font-family: var(--font-ui);
+    font-size: 12px;
+    font-weight: 500;
+    padding: 8px 12px;
+    border-radius: 4px;
+    border: 1px solid var(--cyan);
+    background: var(--cyan-dim);
+    color: var(--cyan);
+    cursor: pointer;
+    margin-top: 6px;
+  }
+  .full-btn:hover { background: rgba(0, 217, 198, 0.22); }
+
+  /* Console */
   .console {
     height: 140px;
     flex-shrink: 0;
@@ -384,6 +460,17 @@
     <div class="toolbar-divider"></div>
     <select class="module-select" id="moduleSelect">
       <option value="core-object-detection">Object Detection</option>
+      <option value="core-measurement">Measurement</option>
+    </select>
+    <div class="toolbar-divider"></div>
+    <select class="module-select" id="cameraIndexSelect" title="Camera source">
+      <option value="0">Camera 0 (built-in)</option>
+      <option value="1">Camera 1 (USB)</option>
+    </select>
+    <select class="module-select" id="cameraResolutionSelect" title="Resolution">
+      <option value="640x480">640x480</option>
+      <option value="1280x720" selected>1280x720</option>
+      <option value="1920x1080">1920x1080</option>
     </select>
     <div class="toolbar-spacer"></div>
     <div class="backend-badge"><span class="dot"></span><span id="backendLabel">CPU backend</span></div>
@@ -392,8 +479,8 @@
   <div class="main">
 
     <div class="tool-rail">
-      <div class="tool-btn active" title="Object detection"><i class="ti ti-box-multiple"></i></div>
-      <div class="tool-btn disabled" title="Measurement (coming soon)"><i class="ti ti-ruler-2"></i></div>
+      <div class="tool-btn active" data-module="core-object-detection" title="Object detection"><i class="ti ti-box-multiple"></i></div>
+      <div class="tool-btn" data-module="core-measurement" title="Measurement"><i class="ti ti-ruler-2"></i></div>
       <div class="tool-btn disabled" title="Color analysis (coming soon)"><i class="ti ti-color-swatch"></i></div>
       <div class="tool-btn disabled" title="OCR (coming soon)"><i class="ti ti-abc"></i></div>
       <div class="tool-btn disabled" title="Motion (coming soon)"><i class="ti ti-wave-sine"></i></div>
@@ -406,15 +493,26 @@
           <i class="ti ti-camera-off"></i>
           <span>NO SIGNAL — PRESS START</span>
         </div>
-        <img id="streamImg" style="display:none;" alt="Live object detection stream">
+        <img id="streamImg" style="display:none;" alt="Live module stream" crossorigin="anonymous">
+        <canvas id="calibrationCanvas" class="hidden"></canvas>
+
         <div class="reticle tl"></div>
         <div class="reticle tr"></div>
         <div class="reticle bl"></div>
         <div class="reticle br"></div>
         <div class="scanline paused" id="scanline"></div>
+
+        <div class="calibration-panel hidden" id="calibrationPanel">
+          <span id="calibrationHint">Click two points on a known reference length</span>
+          <input type="number" id="calibrationLengthInput" placeholder="cm" min="0.1" step="0.1" class="hidden">
+          <button class="vp-btn primary hidden" id="calibrationApplyBtn">Apply</button>
+          <button class="vp-btn" id="calibrationCancelBtn">Cancel</button>
+        </div>
+
         <div class="viewport-controls">
           <button class="vp-btn primary" id="startBtn"><i class="ti ti-player-play"></i>Start</button>
           <button class="vp-btn" id="stopBtn"><i class="ti ti-player-stop"></i>Stop</button>
+          <button class="vp-btn hidden" id="calibrateBtn"><i class="ti ti-focus-2"></i>Calibrate</button>
         </div>
       </div>
     </div>
@@ -423,12 +521,21 @@
       <div class="inspector-section">
         <p class="inspector-title">Live readout</p>
         <div class="stat-row"><span class="label">Status</span><span class="value" id="statStatus">Idle</span></div>
-        <div class="stat-row"><span class="label">Objects</span><span class="value accent" id="statObjects">0</span></div>
-        <div class="stat-row"><span class="label">Latency</span><span class="value" id="statLatency">— ms</span></div>
-        <div class="stat-row"><span class="label">Model</span><span class="value" id="statModel">yolo11n</span></div>
+
+        <div class="detection-only">
+          <div class="stat-row"><span class="label">Objects</span><span class="value accent" id="statObjects">0</span></div>
+          <div class="stat-row"><span class="label">Latency</span><span class="value" id="statLatency">— ms</span></div>
+          <div class="stat-row"><span class="label">Model</span><span class="value" id="statModel">yolo11n</span></div>
+        </div>
+
+        <div class="measurement-only hidden">
+          <div class="stat-row"><span class="label">Measurements</span><span class="value accent" id="statMeasurements">0</span></div>
+          <div class="stat-row"><span class="label">Calibration</span><span class="value warn" id="statCalibration">Uncalibrated</span></div>
+          <div class="stat-row"><span class="label">Px / cm</span><span class="value" id="statPxPerCm">—</span></div>
+        </div>
       </div>
 
-      <div class="inspector-section">
+      <div class="inspector-section detection-only">
         <p class="inspector-title">Detection settings</p>
         <div class="field">
           <div class="field-label"><span>Confidence</span><span class="field-value" id="confVal">0.50</span></div>
@@ -447,6 +554,34 @@
           <div class="switch on" id="confToggle"></div>
         </div>
       </div>
+
+      <div class="inspector-section measurement-only hidden">
+        <p class="inspector-title">Measurement settings</p>
+        <div class="field">
+          <div class="field-label"><span>Canny low</span><span class="field-value" id="cannyLowVal">50</span></div>
+          <input type="range" id="cannyLowSlider" min="0" max="255" step="5" value="50">
+        </div>
+        <div class="field">
+          <div class="field-label"><span>Canny high</span><span class="field-value" id="cannyHighVal">150</span></div>
+          <input type="range" id="cannyHighSlider" min="0" max="255" step="5" value="150">
+        </div>
+        <div class="field">
+          <div class="field-label"><span>Min contour area</span><span class="field-value" id="minAreaVal">500</span></div>
+          <input type="range" id="minAreaSlider" min="100" max="5000" step="100" value="500">
+        </div>
+        <div class="field">
+          <div class="field-label"><span>Unit</span></div>
+          <select class="inline-select" id="unitSelect">
+            <option value="cm">Centimeters</option>
+            <option value="px">Pixels</option>
+          </select>
+        </div>
+        <div class="toggle-row">
+          <span>Show dimensions</span>
+          <div class="switch on" id="showDimsToggle"></div>
+        </div>
+        <button class="full-btn" id="openCalibrateBtn"><i class="ti ti-focus-2"></i> Calibrate reference length</button>
+      </div>
     </div>
 
   </div>
@@ -460,13 +595,27 @@
   </div>
 
 <script>
-const API_BASE = '/api/v1/object-detection';
+// ---------- Module-aware API layer ----------
+let activeModuleId = 'core-object-detection';
+const API_BASES = {
+  'core-object-detection': '/api/v1/object-detection',
+  'core-measurement': '/api/v1/measurement',
+};
+function apiBase() { return API_BASES[activeModuleId]; }
+
 const streamImg = document.getElementById('streamImg');
 const viewportPlaceholder = document.getElementById('viewportPlaceholder');
 const scanline = document.getElementById('scanline');
 const consoleBody = document.getElementById('consoleBody');
+const calibrationCanvas = document.getElementById('calibrationCanvas');
+const calibrationPanel = document.getElementById('calibrationPanel');
+const calibrationHint = document.getElementById('calibrationHint');
+const calibrationLengthInput = document.getElementById('calibrationLengthInput');
+const calibrationApplyBtn = document.getElementById('calibrationApplyBtn');
+const calibrateBtn = document.getElementById('calibrateBtn');
 
 let statusPoll = null;
+let isStreamRunning = false;
 
 function log(msg, level) {
   const line = document.createElement('div');
@@ -478,7 +627,7 @@ function log(msg, level) {
 }
 
 async function apiPost(path, body) {
-  const res = await fetch(API_BASE + path, {
+  const res = await fetch(apiBase() + path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body || {})
@@ -487,34 +636,65 @@ async function apiPost(path, body) {
 }
 
 async function apiGet(path) {
-  const res = await fetch(API_BASE + path);
+  const res = await fetch(apiBase() + path);
   return res.json();
 }
 
-async function startDetection() {
-  log('Starting object detection…');
+// ---------- Module switching ----------
+function setActiveModule(moduleId) {
+  if (moduleId === activeModuleId) return;
+  if (isStreamRunning) stopStream();
+  cancelCalibration();
+
+  activeModuleId = moduleId;
+  document.getElementById('moduleSelect').value = moduleId;
+
+  document.querySelectorAll('.tool-btn[data-module]').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.module === moduleId);
+  });
+
+  const isDetection = moduleId === 'core-object-detection';
+  document.querySelectorAll('.detection-only').forEach(el => el.classList.toggle('hidden', !isDetection));
+  document.querySelectorAll('.measurement-only').forEach(el => el.classList.toggle('hidden', isDetection));
+  calibrateBtn.classList.toggle('hidden', isDetection);
+
+  document.getElementById('statStatus').textContent = 'Idle';
+  log('Switched to ' + (isDetection ? 'Object Detection' : 'Measurement'));
+}
+
+document.querySelectorAll('.tool-btn[data-module]').forEach(btn => {
+  btn.addEventListener('click', () => setActiveModule(btn.dataset.module));
+});
+document.getElementById('moduleSelect').addEventListener('change', (e) => setActiveModule(e.target.value));
+
+// ---------- Stream start/stop ----------
+async function startStream() {
+  log('Starting ' + activeModuleId + '…');
   const result = await apiPost('/start');
   if (result.success) {
-    streamImg.src = API_BASE + '/stream?t=' + Date.now();
+    streamImg.src = apiBase() + '/stream?t=' + Date.now();
     streamImg.style.display = 'block';
     viewportPlaceholder.style.display = 'none';
     scanline.classList.remove('paused');
     document.getElementById('statStatus').textContent = 'Running';
-    log('Object detection started', 'ok');
+    isStreamRunning = true;
+    log((activeModuleId === 'core-object-detection' ? 'Object detection' : 'Measurement') + ' started', 'ok');
     beginPolling();
   } else {
     log('Failed to start: ' + (result.error || 'unknown error'), 'warn');
   }
 }
 
-async function stopDetection() {
-  const result = await apiPost('/stop');
+async function stopStream() {
+  await apiPost('/stop');
   streamImg.style.display = 'none';
   viewportPlaceholder.style.display = 'flex';
   scanline.classList.add('paused');
   document.getElementById('statStatus').textContent = 'Idle';
-  log('Object detection stopped');
+  isStreamRunning = false;
+  log('Stream stopped');
   stopPolling();
+  cancelCalibration();
 }
 
 function beginPolling() {
@@ -524,10 +704,28 @@ function beginPolling() {
       const status = await apiGet('/status');
       if (status.error) return;
       const settings = status.settings || {};
-      document.getElementById('statModel').textContent = settings.model_id || '—';
-      if (status.telemetry) {
-        document.getElementById('statObjects').textContent = status.telemetry.objects_count;
-        document.getElementById('statLatency').textContent = status.telemetry.latency_ms.toFixed(1) + " ms";
+      const telemetry = status.telemetry || {};
+
+      if (activeModuleId === 'core-object-detection') {
+        document.getElementById('statModel').textContent = settings.model_id || '—';
+        if (telemetry.objects_count !== undefined) {
+          document.getElementById('statObjects').textContent = telemetry.objects_count;
+        }
+        if (telemetry.latency_ms !== undefined) {
+          document.getElementById('statLatency').textContent = telemetry.latency_ms.toFixed(1) + ' ms';
+        }
+      } else {
+        if (telemetry.measurement_count !== undefined) {
+          document.getElementById('statMeasurements').textContent = telemetry.measurement_count;
+        }
+        if (telemetry.calibration_status) {
+          const calEl = document.getElementById('statCalibration');
+          calEl.textContent = telemetry.calibration_status;
+          calEl.classList.toggle('ok', telemetry.calibration_status === 'Calibrated');
+          calEl.classList.toggle('warn', telemetry.calibration_status !== 'Calibrated');
+        }
+        document.getElementById('statPxPerCm').textContent =
+          telemetry.pixels_per_cm ? telemetry.pixels_per_cm.toFixed(2) : '—';
       }
     } catch (e) { /* status endpoint not ready yet */ }
   }, 1500);
@@ -537,9 +735,10 @@ function stopPolling() {
   if (statusPoll) { clearInterval(statusPoll); statusPoll = null; }
 }
 
-document.getElementById('startBtn').addEventListener('click', startDetection);
-document.getElementById('stopBtn').addEventListener('click', stopDetection);
+document.getElementById('startBtn').addEventListener('click', startStream);
+document.getElementById('stopBtn').addEventListener('click', stopStream);
 
+// ---------- Object Detection settings ----------
 const confSlider = document.getElementById('confSlider');
 const confVal = document.getElementById('confVal');
 confSlider.addEventListener('input', () => { confVal.textContent = parseFloat(confSlider.value).toFixed(2); });
@@ -568,10 +767,191 @@ function wireToggle(id, settingKey) {
 wireToggle('labelsToggle', 'show_labels');
 wireToggle('confToggle', 'show_conf');
 
+// ---------- Measurement settings ----------
+const cannyLowSlider = document.getElementById('cannyLowSlider');
+const cannyLowVal = document.getElementById('cannyLowVal');
+cannyLowSlider.addEventListener('input', () => { cannyLowVal.textContent = cannyLowSlider.value; });
+cannyLowSlider.addEventListener('change', async () => {
+  await apiPost('/settings', { canny_low: parseInt(cannyLowSlider.value) });
+  log('Canny low set to ' + cannyLowSlider.value);
+});
+
+const cannyHighSlider = document.getElementById('cannyHighSlider');
+const cannyHighVal = document.getElementById('cannyHighVal');
+cannyHighSlider.addEventListener('input', () => { cannyHighVal.textContent = cannyHighSlider.value; });
+cannyHighSlider.addEventListener('change', async () => {
+  await apiPost('/settings', { canny_high: parseInt(cannyHighSlider.value) });
+  log('Canny high set to ' + cannyHighSlider.value);
+});
+
+const minAreaSlider = document.getElementById('minAreaSlider');
+const minAreaVal = document.getElementById('minAreaVal');
+minAreaSlider.addEventListener('input', () => { minAreaVal.textContent = minAreaSlider.value; });
+minAreaSlider.addEventListener('change', async () => {
+  await apiPost('/settings', { min_contour_area: parseFloat(minAreaSlider.value) });
+  log('Min contour area set to ' + minAreaSlider.value);
+});
+
+document.getElementById('unitSelect').addEventListener('change', async (e) => {
+  await apiPost('/settings', { unit: e.target.value });
+  log('Unit set to ' + e.target.value);
+});
+
+wireToggle('showDimsToggle', 'show_dimensions');
+
+// ---------- Calibration workflow ----------
+let calibrationPoints = [];
+let frozenFrameImg = null;
+const ctx = calibrationCanvas.getContext('2d');
+
+function startCalibration() {
+  if (activeModuleId !== 'core-measurement') {
+    log('Calibration is only available for the Measurement module', 'warn');
+    return;
+  }
+  if (!isStreamRunning) {
+    log('Start the stream before calibrating', 'warn');
+    return;
+  }
+
+  calibrationCanvas.width = streamImg.naturalWidth;
+  calibrationCanvas.height = streamImg.naturalHeight;
+
+  frozenFrameImg = new Image();
+  frozenFrameImg.onload = () => {
+    ctx.drawImage(frozenFrameImg, 0, 0, calibrationCanvas.width, calibrationCanvas.height);
+  };
+  const snapshotCanvas = document.createElement('canvas');
+  snapshotCanvas.width = streamImg.naturalWidth;
+  snapshotCanvas.height = streamImg.naturalHeight;
+  snapshotCanvas.getContext('2d').drawImage(streamImg, 0, 0);
+  frozenFrameImg.src = snapshotCanvas.toDataURL('image/png');
+
+  calibrationPoints = [];
+  streamImg.style.display = 'none';
+  calibrationCanvas.classList.remove('hidden');
+  calibrationPanel.classList.remove('hidden');
+  calibrationHint.textContent = 'Click the first point of a known reference length';
+  calibrationLengthInput.classList.add('hidden');
+  calibrationApplyBtn.classList.add('hidden');
+  scanline.classList.add('paused');
+  log('Calibration mode: frame frozen. Click two points on a known length.');
+}
+
+function redrawCalibrationOverlay() {
+  ctx.drawImage(frozenFrameImg, 0, 0, calibrationCanvas.width, calibrationCanvas.height);
+  ctx.fillStyle = '#00D9C6';
+  ctx.strokeStyle = '#00D9C6';
+  ctx.lineWidth = 2;
+
+  calibrationPoints.forEach(p => {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  if (calibrationPoints.length === 2) {
+    ctx.beginPath();
+    ctx.moveTo(calibrationPoints[0].x, calibrationPoints[0].y);
+    ctx.lineTo(calibrationPoints[1].x, calibrationPoints[1].y);
+    ctx.stroke();
+  }
+}
+
+calibrationCanvas.addEventListener('click', (e) => {
+  if (calibrationPoints.length >= 2) return;
+
+  const rect = calibrationCanvas.getBoundingClientRect();
+  const scaleX = calibrationCanvas.width / rect.width;
+  const scaleY = calibrationCanvas.height / rect.height;
+  const x = Math.round((e.clientX - rect.left) * scaleX);
+  const y = Math.round((e.clientY - rect.top) * scaleY);
+
+  calibrationPoints.push({ x, y });
+  redrawCalibrationOverlay();
+
+  if (calibrationPoints.length === 1) {
+    calibrationHint.textContent = 'Click the second point';
+  } else if (calibrationPoints.length === 2) {
+    calibrationHint.textContent = 'Enter the real-world length:';
+    calibrationLengthInput.classList.remove('hidden');
+    calibrationApplyBtn.classList.remove('hidden');
+    calibrationLengthInput.focus();
+  }
+});
+
+calibrationApplyBtn.addEventListener('click', async () => {
+  const realLength = parseFloat(calibrationLengthInput.value);
+  if (!realLength || realLength <= 0) {
+    log('Enter a valid reference length in cm', 'warn');
+    return;
+  }
+  if (calibrationPoints.length !== 2) return;
+
+  const [p1, p2] = calibrationPoints;
+  const result = await apiPost('/calibrate', {
+    x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y, real_length_cm: realLength,
+  });
+
+  if (result.success) {
+    log('Calibration applied successfully', 'ok');
+    endCalibration();
+  } else {
+    log('Calibration failed: ' + (result.error || 'unknown error'), 'warn');
+  }
+});
+
+function cancelCalibration() {
+  calibrationPoints = [];
+  calibrationCanvas.classList.add('hidden');
+  calibrationPanel.classList.add('hidden');
+}
+
+function endCalibration() {
+  cancelCalibration();
+  streamImg.src = apiBase() + '/stream?t=' + Date.now();
+  streamImg.style.display = 'block';
+  scanline.classList.remove('paused');
+}
+
+document.getElementById('calibrationCancelBtn').addEventListener('click', () => {
+  endCalibration();
+  log('Calibration cancelled');
+});
+calibrateBtn.addEventListener('click', startCalibration);
+document.getElementById('openCalibrateBtn').addEventListener('click', startCalibration);
+
+    async function switchCamera() {
+      const index = parseInt(document.getElementById('cameraIndexSelect').value);
+      const resolution = document.getElementById('cameraResolutionSelect').value;
+      log('Switching to camera ' + index + ' at ' + resolution + '…');
+      try {
+        const res = await fetch('/api/v1/camera/switch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ index: index, resolution: resolution }),
+        });
+        const result = await res.json();
+        if (result.success) {
+          log('Camera switched to index ' + index + ' @ ' + resolution, 'ok');
+          if (isStreamRunning) {
+            streamImg.src = apiBase() + '/stream?t=' + Date.now();
+          }
+        } else {
+          log('Camera switch failed: ' + (result.error || 'unknown error'), 'warn');
+        }
+      } catch (e) {
+        log('Camera switch request failed: ' + e.message, 'warn');
+      }
+    }
+
+    document.getElementById('cameraIndexSelect').addEventListener('change', switchCamera);
+    document.getElementById('cameraResolutionSelect').addEventListener('change', switchCamera);
+
 document.getElementById('consoleClear').addEventListener('click', () => { consoleBody.innerHTML = ''; });
 
 log('Pi Vision AI workspace ready');
-log('Object detection module registered', 'ok');
+log('Object Detection and Measurement modules registered', 'ok');
 </script>
 
 </body>
