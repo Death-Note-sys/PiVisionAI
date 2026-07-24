@@ -18,6 +18,7 @@
     --cyan-dim: rgba(0, 217, 198, 0.12);
     --ok: #3ECF8E;
     --ng: #FF5C5C;
+    --amber: #FFB020;
     --text-primary: #E6EAEE;
     --text-muted: #6B7480;
     --text-faint: #454C56;
@@ -42,17 +43,16 @@
 
   /* ---------- Top toolbar ---------- */
   .toolbar {
-    min-height: 48px;
+    height: 48px;
     flex-shrink: 0;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    padding: 8px 16px;
+    padding: 0 16px;
     background: var(--panel);
     border-bottom: 1px solid var(--hairline);
     gap: 12px;
-    position: relative;
-    z-index: 100;
+    row-gap: 6px;
   }
 
   .brand {
@@ -172,7 +172,7 @@
   .viewport-frame {
     position: relative;
     width: min(90%, 960px);
-    aspect-ratio: 16 / 9;
+    aspect-ratio: 4 / 3;
     background: #000;
     overflow: hidden;
   }
@@ -182,11 +182,11 @@
     inset: 0;
     width: 100%;
     height: 100%;
-    object-fit: contain;
+    object-fit: cover;
     display: block;
   }
 
-  #calibrationCanvas {
+  #calibrationCanvas, #teachCanvas {
     position: absolute;
     inset: 0;
     width: 100%;
@@ -265,10 +265,13 @@
   }
 
   .vp-btn.primary { border-color: var(--cyan); color: var(--cyan); }
+  .vp-btn.good { border-color: var(--ok); color: var(--ok); }
+  .vp-btn.bad { border-color: var(--ng); color: var(--ng); }
   .vp-btn:hover { background: var(--panel-raised); }
+  .vp-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
-  /* Calibration input overlay */
-  .calibration-panel {
+  /* Calibration / Teach input overlay */
+  .overlay-panel {
     position: absolute;
     top: 14px;
     left: 50%;
@@ -282,9 +285,12 @@
     gap: 8px;
     font-size: 12px;
     z-index: 6;
+    max-width: 90%;
   }
+  .overlay-panel.teach-good { border-color: var(--ok); }
+  .overlay-panel.teach-bad { border-color: var(--ng); }
 
-  .calibration-panel input[type="number"] {
+  .overlay-panel input[type="number"] {
     width: 70px;
     background: var(--panel-raised);
     border: 1px solid var(--hairline);
@@ -332,6 +338,7 @@
   .stat-row .value.accent { color: var(--cyan); }
   .stat-row .value.ok { color: var(--ok); }
   .stat-row .value.warn { color: var(--ng); }
+  .stat-row .value.amber { color: var(--amber); }
 
   .field { margin-bottom: 14px; }
 
@@ -408,6 +415,54 @@
     margin-top: 6px;
   }
   .full-btn:hover { background: rgba(0, 217, 198, 0.22); }
+  .full-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .full-btn.good { border-color: var(--ok); background: rgba(62,207,142,0.12); color: var(--ok); }
+  .full-btn.bad { border-color: var(--ng); background: rgba(255,92,92,0.12); color: var(--ng); }
+  .full-btn.neutral { border-color: var(--hairline); background: var(--panel-raised); color: var(--text-muted); }
+
+  /* Teach reference thumbnails */
+  .teach-refs {
+    display: flex;
+    gap: 8px;
+    margin: 10px 0;
+  }
+  .teach-ref-slot {
+    flex: 1;
+    aspect-ratio: 1;
+    border-radius: 4px;
+    border: 1px dashed var(--hairline);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+    background: var(--panel-raised);
+  }
+  .teach-ref-slot img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .teach-ref-slot .empty-label {
+    font-size: 10px;
+    color: var(--text-faint);
+    font-family: var(--font-data);
+  }
+  .teach-ref-slot .ref-tag {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    font-size: 9px;
+    font-family: var(--font-data);
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: rgba(11,14,17,0.85);
+  }
+  .teach-ref-slot.good .ref-tag { color: var(--ok); }
+  .teach-ref-slot.bad .ref-tag { color: var(--ng); }
+  .teach-ref-slot.taught { border-style: solid; }
+  .teach-ref-slot.good.taught { border-color: var(--ok); }
+  .teach-ref-slot.bad.taught { border-color: var(--ng); }
 
   /* Console */
   .console {
@@ -461,6 +516,7 @@
     <select class="module-select" id="moduleSelect">
       <option value="core-object-detection">Object Detection</option>
       <option value="core-measurement">Measurement</option>
+      <option value="core-ai-identify">AI Identify</option>
     </select>
     <div class="toolbar-divider"></div>
     <select class="module-select" id="cameraIndexSelect" title="Camera source">
@@ -481,8 +537,9 @@
     <div class="tool-rail">
       <div class="tool-btn active" data-module="core-object-detection" title="Object detection"><i class="ti ti-box-multiple"></i></div>
       <div class="tool-btn" data-module="core-measurement" title="Measurement"><i class="ti ti-ruler-2"></i></div>
+      <div class="tool-btn" data-module="core-ai-identify" title="AI Identify"><i class="ti ti-focus-2"></i></div>
       <div class="tool-btn disabled" title="Color analysis (coming soon)"><i class="ti ti-color-swatch"></i></div>
-      <div class="tool-btn disabled" title="OCR (coming soon)"><i class="ti ti-abc"></i></div>
+      <div class="tool-btn disabled" title="OCR (works, slow on CPU — enable manually)"><i class="ti ti-abc"></i></div>
       <div class="tool-btn disabled" title="Motion (coming soon)"><i class="ti ti-wave-sine"></i></div>
       <div class="tool-btn disabled" title="Shape (coming soon)"><i class="ti ti-shape"></i></div>
     </div>
@@ -495,6 +552,7 @@
         </div>
         <img id="streamImg" style="display:none;" alt="Live module stream" crossorigin="anonymous">
         <canvas id="calibrationCanvas" class="hidden"></canvas>
+        <canvas id="teachCanvas" class="hidden"></canvas>
 
         <div class="reticle tl"></div>
         <div class="reticle tr"></div>
@@ -502,11 +560,18 @@
         <div class="reticle br"></div>
         <div class="scanline paused" id="scanline"></div>
 
-        <div class="calibration-panel hidden" id="calibrationPanel">
+        <div class="overlay-panel hidden" id="calibrationPanel">
           <span id="calibrationHint">Click two points on a known reference length</span>
           <input type="number" id="calibrationLengthInput" placeholder="cm" min="0.1" step="0.1" class="hidden">
           <button class="vp-btn primary hidden" id="calibrationApplyBtn">Apply</button>
           <button class="vp-btn" id="calibrationCancelBtn">Cancel</button>
+        </div>
+
+        <div class="overlay-panel hidden" id="teachPanel">
+          <span id="teachHint">Drag a box around the feature</span>
+          <button class="vp-btn hidden" id="teachRetryBtn">Retry</button>
+          <button class="vp-btn primary hidden" id="teachConfirmBtn">Capture</button>
+          <button class="vp-btn" id="teachCancelBtn">Cancel</button>
         </div>
 
         <div class="viewport-controls">
@@ -532,6 +597,14 @@
           <div class="stat-row"><span class="label">Measurements</span><span class="value accent" id="statMeasurements">0</span></div>
           <div class="stat-row"><span class="label">Calibration</span><span class="value warn" id="statCalibration">Uncalibrated</span></div>
           <div class="stat-row"><span class="label">Px / cm</span><span class="value" id="statPxPerCm">—</span></div>
+        </div>
+
+        <div class="ai-identify-only hidden">
+          <div class="stat-row"><span class="label">Located</span><span class="value" id="statLocated">No</span></div>
+          <div class="stat-row"><span class="label">Classification</span><span class="value warn" id="statClassification">—</span></div>
+          <div class="stat-row"><span class="label">Good sim.</span><span class="value" id="statGoodSim">—</span></div>
+          <div class="stat-row"><span class="label">Bad sim.</span><span class="value" id="statBadSim">—</span></div>
+          <div class="stat-row"><span class="label">Match conf.</span><span class="value" id="statMatchConf">—</span></div>
         </div>
       </div>
 
@@ -582,6 +655,29 @@
         </div>
         <button class="full-btn" id="openCalibrateBtn"><i class="ti ti-focus-2"></i> Calibrate reference length</button>
       </div>
+
+      <div class="inspector-section ai-identify-only hidden">
+        <p class="inspector-title">Teach mode</p>
+        <div class="teach-refs">
+          <div class="teach-ref-slot good" id="goodRefSlot">
+            <span class="ref-tag">GOOD</span>
+            <span class="empty-label">Untaught</span>
+            <img class="hidden" id="goodRefImg" alt="Good reference">
+          </div>
+          <div class="teach-ref-slot bad" id="badRefSlot">
+            <span class="ref-tag">BAD</span>
+            <span class="empty-label">Untaught</span>
+            <img class="hidden" id="badRefImg" alt="Bad reference">
+          </div>
+        </div>
+        <button class="full-btn good" id="teachGoodBtn"><i class="ti ti-square-plus"></i> Teach Good</button>
+        <button class="full-btn bad" id="teachBadBtn" disabled><i class="ti ti-square-plus"></i> Teach Bad</button>
+        <button class="full-btn neutral" id="resetTeachBtn"><i class="ti ti-refresh"></i> Reset Teaching</button>
+        <p style="font-size:11px;color:var(--text-faint);margin-top:10px;line-height:1.5;">
+          Draw a tight box around the actual distinguishing feature, not the
+          whole part — this matters for accuracy.
+        </p>
+      </div>
     </div>
 
   </div>
@@ -600,6 +696,7 @@ let activeModuleId = 'core-object-detection';
 const API_BASES = {
   'core-object-detection': '/api/v1/object-detection',
   'core-measurement': '/api/v1/measurement',
+  'core-ai-identify': '/api/v1/ai-identify',
 };
 function apiBase() { return API_BASES[activeModuleId]; }
 
@@ -607,12 +704,6 @@ const streamImg = document.getElementById('streamImg');
 const viewportPlaceholder = document.getElementById('viewportPlaceholder');
 const scanline = document.getElementById('scanline');
 const consoleBody = document.getElementById('consoleBody');
-const calibrationCanvas = document.getElementById('calibrationCanvas');
-const calibrationPanel = document.getElementById('calibrationPanel');
-const calibrationHint = document.getElementById('calibrationHint');
-const calibrationLengthInput = document.getElementById('calibrationLengthInput');
-const calibrationApplyBtn = document.getElementById('calibrationApplyBtn');
-const calibrateBtn = document.getElementById('calibrateBtn');
 
 let statusPoll = null;
 let isStreamRunning = false;
@@ -645,6 +736,7 @@ function setActiveModule(moduleId) {
   if (moduleId === activeModuleId) return;
   if (isStreamRunning) stopStream();
   cancelCalibration();
+  cancelTeach();
 
   activeModuleId = moduleId;
   document.getElementById('moduleSelect').value = moduleId;
@@ -653,19 +745,49 @@ function setActiveModule(moduleId) {
     btn.classList.toggle('active', btn.dataset.module === moduleId);
   });
 
-  const isDetection = moduleId === 'core-object-detection';
-  document.querySelectorAll('.detection-only').forEach(el => el.classList.toggle('hidden', !isDetection));
-  document.querySelectorAll('.measurement-only').forEach(el => el.classList.toggle('hidden', isDetection));
-  calibrateBtn.classList.toggle('hidden', isDetection);
+  document.querySelectorAll('.detection-only').forEach(el => el.classList.toggle('hidden', moduleId !== 'core-object-detection'));
+  document.querySelectorAll('.measurement-only').forEach(el => el.classList.toggle('hidden', moduleId !== 'core-measurement'));
+  document.querySelectorAll('.ai-identify-only').forEach(el => el.classList.toggle('hidden', moduleId !== 'core-ai-identify'));
+  calibrateBtn.classList.toggle('hidden', moduleId !== 'core-measurement');
+
+  if (moduleId === 'core-ai-identify') resetTeachUIState();
 
   document.getElementById('statStatus').textContent = 'Idle';
-  log('Switched to ' + (isDetection ? 'Object Detection' : 'Measurement'));
+  const names = { 'core-object-detection': 'Object Detection', 'core-measurement': 'Measurement', 'core-ai-identify': 'AI Identify' };
+  log('Switched to ' + names[moduleId]);
 }
 
 document.querySelectorAll('.tool-btn[data-module]').forEach(btn => {
   btn.addEventListener('click', () => setActiveModule(btn.dataset.module));
 });
 document.getElementById('moduleSelect').addEventListener('change', (e) => setActiveModule(e.target.value));
+
+// ---------- Camera source switching ----------
+async function switchCamera() {
+  const index = parseInt(document.getElementById('cameraIndexSelect').value);
+  const resolution = document.getElementById('cameraResolutionSelect').value;
+  log('Switching to camera ' + index + ' at ' + resolution + '…');
+  try {
+    const res = await fetch('/api/v1/camera/switch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ index: index, resolution: resolution }),
+    });
+    const result = await res.json();
+    if (result.success) {
+      log('Camera switched to index ' + index + ' @ ' + resolution, 'ok');
+      if (isStreamRunning) {
+        streamImg.src = apiBase() + '/stream?t=' + Date.now();
+      }
+    } else {
+      log('Camera switch failed: ' + (result.error || 'unknown error'), 'warn');
+    }
+  } catch (e) {
+    log('Camera switch request failed: ' + e.message, 'warn');
+  }
+}
+document.getElementById('cameraIndexSelect').addEventListener('change', switchCamera);
+document.getElementById('cameraResolutionSelect').addEventListener('change', switchCamera);
 
 // ---------- Stream start/stop ----------
 async function startStream() {
@@ -678,7 +800,7 @@ async function startStream() {
     scanline.classList.remove('paused');
     document.getElementById('statStatus').textContent = 'Running';
     isStreamRunning = true;
-    log((activeModuleId === 'core-object-detection' ? 'Object detection' : 'Measurement') + ' started', 'ok');
+    log('Stream started', 'ok');
     beginPolling();
   } else {
     log('Failed to start: ' + (result.error || 'unknown error'), 'warn');
@@ -695,6 +817,7 @@ async function stopStream() {
   log('Stream stopped');
   stopPolling();
   cancelCalibration();
+  cancelTeach();
 }
 
 function beginPolling() {
@@ -708,24 +831,27 @@ function beginPolling() {
 
       if (activeModuleId === 'core-object-detection') {
         document.getElementById('statModel').textContent = settings.model_id || '—';
-        if (telemetry.objects_count !== undefined) {
-          document.getElementById('statObjects').textContent = telemetry.objects_count;
-        }
-        if (telemetry.latency_ms !== undefined) {
-          document.getElementById('statLatency').textContent = telemetry.latency_ms.toFixed(1) + ' ms';
-        }
-      } else {
-        if (telemetry.measurement_count !== undefined) {
-          document.getElementById('statMeasurements').textContent = telemetry.measurement_count;
-        }
+        if (telemetry.objects_count !== undefined) document.getElementById('statObjects').textContent = telemetry.objects_count;
+        if (telemetry.latency_ms !== undefined) document.getElementById('statLatency').textContent = telemetry.latency_ms.toFixed(1) + ' ms';
+
+      } else if (activeModuleId === 'core-measurement') {
+        if (telemetry.measurement_count !== undefined) document.getElementById('statMeasurements').textContent = telemetry.measurement_count;
         if (telemetry.calibration_status) {
           const calEl = document.getElementById('statCalibration');
           calEl.textContent = telemetry.calibration_status;
           calEl.classList.toggle('ok', telemetry.calibration_status === 'Calibrated');
           calEl.classList.toggle('warn', telemetry.calibration_status !== 'Calibrated');
         }
-        document.getElementById('statPxPerCm').textContent =
-          telemetry.pixels_per_cm ? telemetry.pixels_per_cm.toFixed(2) : '—';
+        document.getElementById('statPxPerCm').textContent = telemetry.pixels_per_cm ? telemetry.pixels_per_cm.toFixed(2) : '—';
+
+      } else if (activeModuleId === 'core-ai-identify') {
+        document.getElementById('statLocated').textContent = telemetry.located ? 'Yes' : 'No';
+        const clsEl = document.getElementById('statClassification');
+        clsEl.textContent = telemetry.classification || '—';
+        clsEl.className = 'value ' + (telemetry.classification === 'Good' ? 'ok' : telemetry.classification === 'Bad' ? 'warn' : 'amber');
+        document.getElementById('statGoodSim').textContent = telemetry.good_similarity != null ? telemetry.good_similarity.toFixed(4) : '—';
+        document.getElementById('statBadSim').textContent = telemetry.bad_similarity != null ? telemetry.bad_similarity.toFixed(4) : '—';
+        document.getElementById('statMatchConf').textContent = telemetry.match_confidence != null ? telemetry.match_confidence.toFixed(4) : '—';
       }
     } catch (e) { /* status endpoint not ready yet */ }
   }, 1500);
@@ -799,10 +925,27 @@ document.getElementById('unitSelect').addEventListener('change', async (e) => {
 
 wireToggle('showDimsToggle', 'show_dimensions');
 
-// ---------- Calibration workflow ----------
+// ---------- Measurement calibration workflow ----------
+const calibrationCanvas = document.getElementById('calibrationCanvas');
+const calibrationPanel = document.getElementById('calibrationPanel');
+const calibrationHint = document.getElementById('calibrationHint');
+const calibrationLengthInput = document.getElementById('calibrationLengthInput');
+const calibrationApplyBtn = document.getElementById('calibrationApplyBtn');
+const calibrateBtn = document.getElementById('calibrateBtn');
+
 let calibrationPoints = [];
 let frozenFrameImg = null;
-const ctx = calibrationCanvas.getContext('2d');
+const calCtx = calibrationCanvas.getContext('2d');
+
+function captureFrozenSnapshot(targetCanvas) {
+  targetCanvas.width = streamImg.naturalWidth;
+  targetCanvas.height = streamImg.naturalHeight;
+  const snapshotCanvas = document.createElement('canvas');
+  snapshotCanvas.width = streamImg.naturalWidth;
+  snapshotCanvas.height = streamImg.naturalHeight;
+  snapshotCanvas.getContext('2d').drawImage(streamImg, 0, 0);
+  return snapshotCanvas.toDataURL('image/png');
+}
 
 function startCalibration() {
   if (activeModuleId !== 'core-measurement') {
@@ -814,18 +957,12 @@ function startCalibration() {
     return;
   }
 
-  calibrationCanvas.width = streamImg.naturalWidth;
-  calibrationCanvas.height = streamImg.naturalHeight;
-
+  const dataUrl = captureFrozenSnapshot(calibrationCanvas);
   frozenFrameImg = new Image();
   frozenFrameImg.onload = () => {
-    ctx.drawImage(frozenFrameImg, 0, 0, calibrationCanvas.width, calibrationCanvas.height);
+    calCtx.drawImage(frozenFrameImg, 0, 0, calibrationCanvas.width, calibrationCanvas.height);
   };
-  const snapshotCanvas = document.createElement('canvas');
-  snapshotCanvas.width = streamImg.naturalWidth;
-  snapshotCanvas.height = streamImg.naturalHeight;
-  snapshotCanvas.getContext('2d').drawImage(streamImg, 0, 0);
-  frozenFrameImg.src = snapshotCanvas.toDataURL('image/png');
+  frozenFrameImg.src = dataUrl;
 
   calibrationPoints = [];
   streamImg.style.display = 'none';
@@ -839,22 +976,22 @@ function startCalibration() {
 }
 
 function redrawCalibrationOverlay() {
-  ctx.drawImage(frozenFrameImg, 0, 0, calibrationCanvas.width, calibrationCanvas.height);
-  ctx.fillStyle = '#00D9C6';
-  ctx.strokeStyle = '#00D9C6';
-  ctx.lineWidth = 2;
+  calCtx.drawImage(frozenFrameImg, 0, 0, calibrationCanvas.width, calibrationCanvas.height);
+  calCtx.fillStyle = '#00D9C6';
+  calCtx.strokeStyle = '#00D9C6';
+  calCtx.lineWidth = 2;
 
   calibrationPoints.forEach(p => {
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
-    ctx.fill();
+    calCtx.beginPath();
+    calCtx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+    calCtx.fill();
   });
 
   if (calibrationPoints.length === 2) {
-    ctx.beginPath();
-    ctx.moveTo(calibrationPoints[0].x, calibrationPoints[0].y);
-    ctx.lineTo(calibrationPoints[1].x, calibrationPoints[1].y);
-    ctx.stroke();
+    calCtx.beginPath();
+    calCtx.moveTo(calibrationPoints[0].x, calibrationPoints[0].y);
+    calCtx.lineTo(calibrationPoints[1].x, calibrationPoints[1].y);
+    calCtx.stroke();
   }
 }
 
@@ -921,37 +1058,210 @@ document.getElementById('calibrationCancelBtn').addEventListener('click', () => 
 calibrateBtn.addEventListener('click', startCalibration);
 document.getElementById('openCalibrateBtn').addEventListener('click', startCalibration);
 
-    async function switchCamera() {
-      const index = parseInt(document.getElementById('cameraIndexSelect').value);
-      const resolution = document.getElementById('cameraResolutionSelect').value;
-      log('Switching to camera ' + index + ' at ' + resolution + '…');
-      try {
-        const res = await fetch('/api/v1/camera/switch', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ index: index, resolution: resolution }),
-        });
-        const result = await res.json();
-        if (result.success) {
-          log('Camera switched to index ' + index + ' @ ' + resolution, 'ok');
-          if (isStreamRunning) {
-            streamImg.src = apiBase() + '/stream?t=' + Date.now();
-          }
-        } else {
-          log('Camera switch failed: ' + (result.error || 'unknown error'), 'warn');
-        }
-      } catch (e) {
-        log('Camera switch request failed: ' + e.message, 'warn');
-      }
+// ---------- AI Identify teach workflow ----------
+// Unlike calibration (2-point click for a line), teaching needs a
+// drag-rectangle: mousedown -> mousemove (live preview) -> mouseup (confirm
+// box). Good and Bad are taught in SEPARATE freeze/capture cycles, since in
+// real use they are physically different objects placed one at a time —
+// there is no single frame containing both.
+const teachCanvas = document.getElementById('teachCanvas');
+const teachPanel = document.getElementById('teachPanel');
+const teachHint = document.getElementById('teachHint');
+const teachRetryBtn = document.getElementById('teachRetryBtn');
+const teachConfirmBtn = document.getElementById('teachConfirmBtn');
+const teachCancelBtn = document.getElementById('teachCancelBtn');
+const teachGoodBtn = document.getElementById('teachGoodBtn');
+const teachBadBtn = document.getElementById('teachBadBtn');
+const resetTeachBtn = document.getElementById('resetTeachBtn');
+const teachCtx = teachCanvas.getContext('2d');
+
+let teachTarget = null;       // 'good' | 'bad' | null
+let teachFrozenImg = null;
+let teachRect = null;         // {x,y,w,h} in canvas-native coords
+let isDraggingTeachBox = false;
+let dragStart = null;
+let goodTaught = false;
+let badTaught = false;
+
+function resetTeachUIState() {
+  goodTaught = false;
+  badTaught = false;
+  document.getElementById('goodRefImg').classList.add('hidden');
+  document.getElementById('badRefImg').classList.add('hidden');
+  document.querySelectorAll('.teach-ref-slot .empty-label').forEach(el => el.classList.remove('hidden'));
+  document.getElementById('goodRefSlot').classList.remove('taught');
+  document.getElementById('badRefSlot').classList.remove('taught');
+  teachBadBtn.disabled = true;
+  cancelTeach();
+}
+
+function startTeach(target) {
+  if (activeModuleId !== 'core-ai-identify') return;
+  if (!isStreamRunning) {
+    log('Start the stream before teaching', 'warn');
+    return;
+  }
+  cancelCalibration();
+
+  teachTarget = target;
+  const dataUrl = captureFrozenSnapshot(teachCanvas);
+  teachFrozenImg = new Image();
+  teachFrozenImg.onload = () => {
+    teachCtx.drawImage(teachFrozenImg, 0, 0, teachCanvas.width, teachCanvas.height);
+  };
+  teachFrozenImg.src = dataUrl;
+
+  teachRect = null;
+  streamImg.style.display = 'none';
+  teachCanvas.classList.remove('hidden');
+  teachPanel.classList.remove('hidden');
+  teachPanel.className = 'overlay-panel teach-' + target;
+  teachHint.textContent = 'Drag a tight box around the ' + target.toUpperCase() + ' feature';
+  teachRetryBtn.classList.add('hidden');
+  teachConfirmBtn.classList.add('hidden');
+  scanline.classList.add('paused');
+  log('Teach ' + target + ': frame frozen. Drag a box around the feature.');
+}
+
+function redrawTeachOverlay() {
+  teachCtx.drawImage(teachFrozenImg, 0, 0, teachCanvas.width, teachCanvas.height);
+  if (!teachRect) return;
+  teachCtx.strokeStyle = teachTarget === 'good' ? '#3ECF8E' : '#FF5C5C';
+  teachCtx.lineWidth = 2;
+  teachCtx.strokeRect(teachRect.x, teachRect.y, teachRect.w, teachRect.h);
+}
+
+function canvasPoint(e) {
+  const rect = teachCanvas.getBoundingClientRect();
+  const scaleX = teachCanvas.width / rect.width;
+  const scaleY = teachCanvas.height / rect.height;
+  return {
+    x: Math.round((e.clientX - rect.left) * scaleX),
+    y: Math.round((e.clientY - rect.top) * scaleY),
+  };
+}
+
+teachCanvas.addEventListener('mousedown', (e) => {
+  if (!teachTarget) return;
+  isDraggingTeachBox = true;
+  dragStart = canvasPoint(e);
+  teachRect = { x: dragStart.x, y: dragStart.y, w: 0, h: 0 };
+});
+
+teachCanvas.addEventListener('mousemove', (e) => {
+  if (!isDraggingTeachBox) return;
+  const p = canvasPoint(e);
+  teachRect = {
+    x: Math.min(dragStart.x, p.x),
+    y: Math.min(dragStart.y, p.y),
+    w: Math.abs(p.x - dragStart.x),
+    h: Math.abs(p.y - dragStart.y),
+  };
+  redrawTeachOverlay();
+});
+
+teachCanvas.addEventListener('mouseup', () => {
+  if (!isDraggingTeachBox) return;
+  isDraggingTeachBox = false;
+  if (!teachRect || teachRect.w < 10 || teachRect.h < 10) {
+    teachHint.textContent = 'Box too small — try again';
+    teachRect = null;
+    redrawTeachOverlay();
+    return;
+  }
+  teachHint.textContent = 'Confirm or retry';
+  teachRetryBtn.classList.remove('hidden');
+  teachConfirmBtn.classList.remove('hidden');
+});
+
+teachRetryBtn.addEventListener('click', () => {
+  teachRect = null;
+  teachRetryBtn.classList.add('hidden');
+  teachConfirmBtn.classList.add('hidden');
+  teachHint.textContent = 'Drag a tight box around the ' + teachTarget.toUpperCase() + ' feature';
+  redrawTeachOverlay();
+});
+
+teachConfirmBtn.addEventListener('click', async () => {
+  if (!teachRect || !teachTarget) return;
+
+  const path = teachTarget === 'good' ? '/teach-good' : '/teach-bad';
+  const result = await apiPost(path, {
+    x: teachRect.x, y: teachRect.y, w: teachRect.w, h: teachRect.h,
+  });
+
+  if (result.success) {
+    const thumbCanvas = document.createElement('canvas');
+    thumbCanvas.width = teachRect.w;
+    thumbCanvas.height = teachRect.h;
+    thumbCanvas.getContext('2d').drawImage(
+      teachFrozenImg, teachRect.x, teachRect.y, teachRect.w, teachRect.h,
+      0, 0, teachRect.w, teachRect.h
+    );
+    const thumbDataUrl = thumbCanvas.toDataURL('image/png');
+
+    if (teachTarget === 'good') {
+      goodTaught = true;
+      const img = document.getElementById('goodRefImg');
+      img.src = thumbDataUrl;
+      img.classList.remove('hidden');
+      document.querySelector('#goodRefSlot .empty-label').classList.add('hidden');
+      document.getElementById('goodRefSlot').classList.add('taught');
+      teachBadBtn.disabled = false;
+      log('Good reference taught. Swap in the Bad object, then click "Teach Bad".', 'ok');
+    } else {
+      badTaught = true;
+      const img = document.getElementById('badRefImg');
+      img.src = thumbDataUrl;
+      img.classList.remove('hidden');
+      document.querySelector('#badRefSlot .empty-label').classList.add('hidden');
+      document.getElementById('badRefSlot').classList.add('taught');
+      log('Bad reference taught. Teach status: Taught.', 'ok');
     }
 
-    document.getElementById('cameraIndexSelect').addEventListener('change', switchCamera);
-    document.getElementById('cameraResolutionSelect').addEventListener('change', switchCamera);
+    endTeach();
+  } else {
+    log('Teach ' + teachTarget + ' failed: ' + (result.error || 'unknown error'), 'warn');
+  }
+});
+
+function cancelTeach() {
+  teachTarget = null;
+  teachRect = null;
+  isDraggingTeachBox = false;
+  teachCanvas.classList.add('hidden');
+  teachPanel.classList.add('hidden');
+}
+
+function endTeach() {
+  cancelTeach();
+  streamImg.src = apiBase() + '/stream?t=' + Date.now();
+  streamImg.style.display = 'block';
+  scanline.classList.remove('paused');
+}
+
+teachCancelBtn.addEventListener('click', () => {
+  endTeach();
+  log('Teaching cancelled');
+});
+
+teachGoodBtn.addEventListener('click', () => startTeach('good'));
+teachBadBtn.addEventListener('click', () => startTeach('bad'));
+
+resetTeachBtn.addEventListener('click', async () => {
+  const result = await apiPost('/reset-teaching');
+  if (result.success) {
+    resetTeachUIState();
+    log('Teaching reset', 'ok');
+  } else {
+    log('Reset failed: ' + (result.error || 'unknown error'), 'warn');
+  }
+});
 
 document.getElementById('consoleClear').addEventListener('click', () => { consoleBody.innerHTML = ''; });
 
 log('Pi Vision AI workspace ready');
-log('Object Detection and Measurement modules registered', 'ok');
+log('Object Detection, Measurement, and AI Identify modules registered', 'ok');
 </script>
 
 </body>

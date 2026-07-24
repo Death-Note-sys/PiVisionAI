@@ -1,0 +1,28 @@
+{
+    "id": "core-ai-identify",
+    "name": "AI Identify",
+    "version": "1.0.0",
+    "author": "Pi Vision AI Core",
+    "description": "Pose-invariant part localization and good/bad differentiation, taught from two reference images (KEYENCE IV4-inspired, no training required).",
+    "category": "Vision",
+    "task": "AI Identify",
+    "entry_point": "plugin.py:AIIdentifyPlugin",
+    "renderer": "ai_identify",
+    "api_version": "v1",
+    "supported_camera_types": ["rgb"],
+    "supported_results": ["IdentifyResult"],
+    "required_models": [],
+    "required_backends": [],
+    "optional_backends": [],
+    "permissions": ["camera"],
+    "dependencies": ["opencv-python", "numpy", "scikit-image"],
+    "minimum_framework_version": "1.0.0",
+    "license": "MIT",
+    "settings_schema": {
+        "min_match_count": {"type": "integer", "default": 10},
+        "match_ratio_threshold": {"type": "float", "default": 0.75},
+        "classification_margin": {"type": "float", "default": 0.05},
+        "show_bbox": {"type": "boolean", "default": true},
+        "show_classification": {"type": "boolean", "default": true}
+    }
+}

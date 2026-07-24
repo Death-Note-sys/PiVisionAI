@@ -16,6 +16,13 @@ logs/
 recordings/
 weights/
 *.pt
+sessions/
+grab_latest_frame.py
+test_crop.py
+test_grab_frame.py
+test_status.py
+test_teach.py
+test_teach_bad.py
 
 # IDE
 .vscode/

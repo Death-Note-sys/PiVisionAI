@@ -12,6 +12,7 @@ from .v1.gallery import bp as gallery_bp
 from .v1.object_detection import bp as object_detection_bp
 from .v1.measurement import bp as measurement_bp
 from .v1.ocr import bp as ocr_bp
+from .v1.ai_identify import bp as ai_identify_bp
 
 logger = logging.getLogger(__name__)
 
@@ -42,10 +43,12 @@ def create_app() -> Flask:
     app.register_blueprint(object_detection_bp)
     app.register_blueprint(measurement_bp)
     app.register_blueprint(ocr_bp)
+    app.register_blueprint(ai_identify_bp)
     
     limiter.exempt(object_detection_bp)
     limiter.exempt(measurement_bp)
     limiter.exempt(ocr_bp)
+    limiter.exempt(ai_identify_bp)
     
     @app.route('/')
     def index():

@@ -10,6 +10,16 @@ class ModuleResult(BaseModel):
     timestamp: float = 0.0
     custom_metadata: Dict[str, Any] = Field(default_factory=dict)
 
+class IdentifyResult(ModuleResult):
+    """Standardized result for AI Identify / Differentiate."""
+    teach_status: str = "Untaught"  # "Untaught" | "Partial" | "Taught"
+    located: bool = False
+    bbox: Optional[Dict[str, Any]] = None
+    classification: Optional[str] = None  # "Good" | "Bad" | "Uncertain" | None
+    good_similarity: Optional[float] = None
+    bad_similarity: Optional[float] = None
+    match_confidence: float = 0.0
+
 class DetectionResult(ModuleResult):
     """Standardized result for Object Detection."""
     detections: List[Dict[str, Any]] = Field(default_factory=list) # Dicts with box, label, conf, id
