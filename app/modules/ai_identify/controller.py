@@ -103,6 +103,13 @@ class AIIdentifyController(IModule):
         self.event_bus.publish("AIIdentifyReset", {})
         return True
 
+    def on_raw_frame(self, frame) -> None:
+        """Cheap hook called every captured frame regardless of trigger
+        mode, so teach_good()/teach_bad() always have a reasonably fresh
+        frame to crop from even while full inference is gated behind
+        Single/Interval trigger mode."""
+        self.last_frame = frame.copy()
+
     def _match_against_reference(self, kp_frame, des_frame, frame,
                                   ref_keypoints, ref_descriptors, ref_image,
                                   ratio_thresh, min_match_count):

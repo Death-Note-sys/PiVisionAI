@@ -43,7 +43,7 @@
 
   /* ---------- Top toolbar ---------- */
   .toolbar {
-    height: 48px;
+    min-height: 48px;
     flex-shrink: 0;
     display: flex;
     flex-wrap: wrap;
@@ -104,6 +104,46 @@
     background: var(--ok);
   }
 
+  /* ---------- Trigger controls ---------- */
+  .trigger-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .trigger-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+  }
+
+  #triggerIntervalInput {
+    width: 64px;
+    background: var(--panel-raised);
+    border: 1px solid var(--hairline);
+    color: var(--text-primary);
+    font-family: var(--font-data);
+    font-size: 12px;
+    padding: 5px 8px;
+    border-radius: 4px;
+  }
+
+  #fireTriggerBtn {
+    font-family: var(--font-ui);
+    font-size: 12px;
+    font-weight: 500;
+    padding: 5px 12px;
+    border-radius: 4px;
+    border: 1px solid var(--amber);
+    background: rgba(255,176,32,0.1);
+    color: var(--amber);
+    cursor: pointer;
+  }
+  #fireTriggerBtn:hover { background: rgba(255,176,32,0.2); }
+  #fireTriggerBtn:disabled { opacity: 0.35; cursor: not-allowed; }
+
   /* ---------- Main layout ---------- */
   .main {
     flex: 1;
@@ -161,6 +201,7 @@
     align-items: center;
     justify-content: center;
     position: relative;
+    overflow: hidden;
     background: #000;
     background-image:
       linear-gradient(var(--hairline) 1px, transparent 1px),
@@ -172,6 +213,7 @@
   .viewport-frame {
     position: relative;
     width: min(90%, 960px);
+    max-height: 100%;
     aspect-ratio: 4 / 3;
     background: #000;
     overflow: hidden;
@@ -529,6 +571,18 @@
       <option value="1920x1080">1920x1080</option>
     </select>
     <div class="toolbar-spacer"></div>
+    <div class="trigger-group">
+      <span class="trigger-label">Trigger</span>
+      <select class="module-select" id="triggerModeSelect" title="Trigger mode">
+        <option value="continuous" selected>Continuous</option>
+        <option value="single">Single</option>
+        <option value="interval">Interval</option>
+      </select>
+      <input type="number" id="triggerIntervalInput" value="5" min="0.1" step="0.5"
+             title="Interval (seconds)" class="hidden">
+      <button id="fireTriggerBtn" disabled title="Fire a single trigger shot"><i class="ti ti-bolt"></i> Fire</button>
+    </div>
+    <div class="toolbar-divider"></div>
     <div class="backend-badge"><span class="dot"></span><span id="backendLabel">CPU backend</span></div>
   </div>
 
@@ -755,6 +809,9 @@ function setActiveModule(moduleId) {
   document.getElementById('statStatus').textContent = 'Idle';
   const names = { 'core-object-detection': 'Object Detection', 'core-measurement': 'Measurement', 'core-ai-identify': 'AI Identify' };
   log('Switched to ' + names[moduleId]);
+  // Reset trigger UI to match backend's set_module() reset
+  document.getElementById('triggerModeSelect').value = 'continuous';
+  applyTriggerMode('continuous');
 }
 
 document.querySelectorAll('.tool-btn[data-module]').forEach(btn => {
@@ -1259,6 +1316,75 @@ resetTeachBtn.addEventListener('click', async () => {
 });
 
 document.getElementById('consoleClear').addEventListener('click', () => { consoleBody.innerHTML = ''; });
+
+// ---------- Trigger mode ----------
+const triggerModeSelect = document.getElementById('triggerModeSelect');
+const triggerIntervalInput = document.getElementById('triggerIntervalInput');
+const fireTriggerBtn = document.getElementById('fireTriggerBtn');
+
+async function applyTriggerMode(mode) {
+  triggerIntervalInput.classList.toggle('hidden', mode !== 'interval');
+  fireTriggerBtn.disabled = (mode === 'continuous');
+
+  try {
+    const res = await fetch('/api/v1/trigger/mode', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode }),
+    });
+    const result = await res.json();
+    if (result.success) {
+      log('Trigger mode: ' + mode, 'ok');
+      if (mode === 'interval') {
+        const secs = parseFloat(triggerIntervalInput.value);
+        await setTriggerInterval(secs);
+      }
+    } else {
+      log('Trigger mode change failed: ' + (result.error || 'unknown'), 'warn');
+    }
+  } catch (e) {
+    log('Trigger request failed: ' + e.message, 'warn');
+  }
+}
+
+async function setTriggerInterval(seconds) {
+  try {
+    const res = await fetch('/api/v1/trigger/interval', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ seconds }),
+    });
+    const result = await res.json();
+    if (result.success) {
+      log('Trigger interval: ' + seconds + 's', 'ok');
+    } else {
+      log('Set interval failed: ' + (result.error || 'unknown'), 'warn');
+    }
+  } catch (e) {
+    log('Interval request failed: ' + e.message, 'warn');
+  }
+}
+
+triggerModeSelect.addEventListener('change', () => applyTriggerMode(triggerModeSelect.value));
+
+triggerIntervalInput.addEventListener('change', () => {
+  const secs = parseFloat(triggerIntervalInput.value);
+  if (secs > 0) setTriggerInterval(secs);
+});
+
+fireTriggerBtn.addEventListener('click', async () => {
+  try {
+    const res = await fetch('/api/v1/trigger/fire', { method: 'POST' });
+    const result = await res.json();
+    if (result.success) {
+      log('Trigger fired', 'ok');
+    } else {
+      log('Fire failed: ' + (result.error || 'unknown'), 'warn');
+    }
+  } catch (e) {
+    log('Fire request failed: ' + e.message, 'warn');
+  }
+});
 
 log('Pi Vision AI workspace ready');
 log('Object Detection, Measurement, and AI Identify modules registered', 'ok');
