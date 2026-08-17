@@ -22,12 +22,9 @@ class AIIdentifyController(IModule):
         self.last_result: IdentifyResult = IdentifyResult()
 
         self.teach_status = "Untaught"
-        self.good_reference: Optional[np.ndarray] = None
-        self.bad_reference: Optional[np.ndarray] = None
-        self.good_keypoints = None
-        self.good_descriptors = None
-        self.bad_keypoints = None
-        self.bad_descriptors = None
+        self.good_references: list = []  # each: {"image", "keypoints", "descriptors"}
+        self.bad_references: list = []
+        self.MAX_REFERENCES_PER_CLASS = 5
 
         self.orb = cv2.ORB_create(nfeatures=1000)
         self.matcher = cv2.BFMatcher(cv2.NORM_HAMMING)
@@ -49,9 +46,11 @@ class AIIdentifyController(IModule):
         return frame[y:y+h, x:x+w].copy()
 
     def _update_teach_status(self):
-        if self.good_reference is not None and self.bad_reference is not None:
+        has_good = len(self.good_references) > 0
+        has_bad = len(self.bad_references) > 0
+        if has_good and has_bad:
             self.teach_status = "Taught"
-        elif self.good_reference is not None or self.bad_reference is not None:
+        elif has_good or has_bad:
             self.teach_status = "Partial"
         else:
             self.teach_status = "Untaught"
@@ -60,6 +59,9 @@ class AIIdentifyController(IModule):
         if self.last_frame is None:
             logger.error("Cannot teach: no frame available yet.")
             return False
+        if len(self.good_references) >= self.MAX_REFERENCES_PER_CLASS:
+            logger.error(f"Good reference gallery full (max {self.MAX_REFERENCES_PER_CLASS}) — remove one first.")
+            return False
         crop = self._safe_crop(self.last_frame, x, y, w, h)
         if crop is None:
             return False
@@ -67,16 +69,17 @@ class AIIdentifyController(IModule):
         if des is None or len(kp) < 10:
             logger.error("Good reference has too few distinctive features to track reliably.")
             return False
-        self.good_reference = crop
-        self.good_keypoints = kp
-        self.good_descriptors = des
+        self.good_references.append({"image": crop, "keypoints": kp, "descriptors": des})
         self._update_teach_status()
-        self.event_bus.publish("AIIdentifyTaughtGood", {})
+        self.event_bus.publish("AIIdentifyTaughtGood", {"count": len(self.good_references)})
         return True
 
     def teach_bad(self, x: int, y: int, w: int, h: int) -> bool:
         if self.last_frame is None:
             logger.error("Cannot teach: no frame available yet.")
+            return False
+        if len(self.bad_references) >= self.MAX_REFERENCES_PER_CLASS:
+            logger.error(f"Bad reference gallery full (max {self.MAX_REFERENCES_PER_CLASS}) — remove one first.")
             return False
         crop = self._safe_crop(self.last_frame, x, y, w, h)
         if crop is None:
@@ -85,20 +88,32 @@ class AIIdentifyController(IModule):
         if des is None or len(kp) < 10:
             logger.error("Bad reference has too few distinctive features to track reliably.")
             return False
-        self.bad_reference = crop
-        self.bad_keypoints = kp
-        self.bad_descriptors = des
+        self.bad_references.append({"image": crop, "keypoints": kp, "descriptors": des})
         self._update_teach_status()
-        self.event_bus.publish("AIIdentifyTaughtBad", {})
+        self.event_bus.publish("AIIdentifyTaughtBad", {"count": len(self.bad_references)})
+        return True
+
+    def remove_good_reference(self, index: int) -> bool:
+        if index < 0 or index >= len(self.good_references):
+            logger.error(f"Invalid good reference index: {index}")
+            return False
+        del self.good_references[index]
+        self._update_teach_status()
+        self.event_bus.publish("AIIdentifyRemovedGood", {"index": index, "remaining": len(self.good_references)})
+        return True
+
+    def remove_bad_reference(self, index: int) -> bool:
+        if index < 0 or index >= len(self.bad_references):
+            logger.error(f"Invalid bad reference index: {index}")
+            return False
+        del self.bad_references[index]
+        self._update_teach_status()
+        self.event_bus.publish("AIIdentifyRemovedBad", {"index": index, "remaining": len(self.bad_references)})
         return True
 
     def reset_teaching(self) -> bool:
-        self.good_reference = None
-        self.bad_reference = None
-        self.good_keypoints = None
-        self.good_descriptors = None
-        self.bad_keypoints = None
-        self.bad_descriptors = None
+        self.good_references = []
+        self.bad_references = []
         self.teach_status = "Untaught"
         self.event_bus.publish("AIIdentifyReset", {})
         return True
@@ -164,6 +179,28 @@ class AIIdentifyController(IModule):
             "ssim_score": ssim_score,
         }
 
+    def _find_best_match(self, kp_frame, des_frame, frame, references,
+                          ratio_thresh, min_match_count):
+        """Try the live frame against every image in a gallery
+        independently (reusing _match_against_reference unchanged per
+        image), and return whichever scores the highest geometric inlier
+        ratio, tagged with which reference index matched."""
+        best = None
+        best_index = None
+        for i, ref in enumerate(references):
+            match = self._match_against_reference(
+                kp_frame, des_frame, frame,
+                ref["keypoints"], ref["descriptors"], ref["image"],
+                ratio_thresh, min_match_count,
+            )
+            if match is not None:
+                if best is None or match["inlier_ratio"] > best["inlier_ratio"]:
+                    best = match
+                    best_index = i
+        if best is not None:
+            best["reference_index"] = best_index
+        return best
+
     def process(self, context: Dict[str, Any]) -> IdentifyResult:
         frame = context["frame"]
         self.last_frame = frame.copy()
@@ -183,20 +220,14 @@ class AIIdentifyController(IModule):
             gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             kp_frame, des_frame = self.orb.detectAndCompute(gray_frame, None)
 
-            good_match = self._match_against_reference(
-                kp_frame, des_frame, frame,
-                self.good_keypoints, self.good_descriptors, self.good_reference,
-                ratio_thresh, min_match_count,
-            )
-            bad_match = self._match_against_reference(
-                kp_frame, des_frame, frame,
-                self.bad_keypoints, self.bad_descriptors, self.bad_reference,
-                ratio_thresh, min_match_count,
-            )
+            good_match = self._find_best_match(kp_frame, des_frame, frame, self.good_references, ratio_thresh, min_match_count)
+            bad_match = self._find_best_match(kp_frame, des_frame, frame, self.bad_references, ratio_thresh, min_match_count)
 
             if good_match is None and bad_match is None:
                 result = IdentifyResult(
                     teach_status=self.teach_status, located=False,
+                    good_reference_count=len(self.good_references),
+                    bad_reference_count=len(self.bad_references),
                     latency_ms=(time.perf_counter() - start) * 1000, timestamp=time.time(),
                 )
                 self.last_result = result
@@ -227,6 +258,10 @@ class AIIdentifyController(IModule):
                 good_similarity=round(good_match["ssim_score"], 4) if good_match else None,
                 bad_similarity=round(bad_match["ssim_score"], 4) if bad_match else None,
                 match_confidence=round(chosen["inlier_ratio"], 4),
+                good_reference_index=good_match.get("reference_index") if good_match else None,
+                bad_reference_index=bad_match.get("reference_index") if bad_match else None,
+                good_reference_count=len(self.good_references),
+                bad_reference_count=len(self.bad_references),
                 latency_ms=(time.perf_counter() - start) * 1000,
                 timestamp=time.time(),
             )

@@ -19,6 +19,10 @@ class IdentifyResult(ModuleResult):
     good_similarity: Optional[float] = None
     bad_similarity: Optional[float] = None
     match_confidence: float = 0.0
+    good_reference_index: Optional[int] = None
+    bad_reference_index: Optional[int] = None
+    good_reference_count: int = 0
+    bad_reference_count: int = 0
 
 class DetectionResult(ModuleResult):
     """Standardized result for Object Detection."""
