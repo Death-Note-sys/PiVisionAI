@@ -65,7 +65,7 @@ def test_teach_good_rejects_region_too_small(controller):
 
     result = controller.teach_good(10, 10, 2, 2)
     assert result is False
-    assert controller.good_reference is None
+    assert len(controller.good_references) == 0
 
 
 def test_teach_good_succeeds_on_feature_rich_region(controller):
@@ -74,7 +74,7 @@ def test_teach_good_succeeds_on_feature_rich_region(controller):
 
     result = controller.teach_good(0, 0, 200, 200)
     assert result is True
-    assert controller.good_reference is not None
+    assert len(controller.good_references) == 1
     assert controller.teach_status == "Partial"
 
 
@@ -97,8 +97,8 @@ def test_reset_teaching_clears_all_state(controller):
 
     assert result is True
     assert controller.teach_status == "Untaught"
-    assert controller.good_reference is None
-    assert controller.bad_reference is None
+    assert len(controller.good_references) == 0
+    assert len(controller.bad_references) == 0
 
 
 def test_configure_updates_settings(controller):
@@ -129,3 +129,85 @@ def test_process_classifies_via_geometric_match_when_only_good_matches(controlle
     assert result.classification == "Good"
     assert result.good_similarity is not None
     assert result.bad_similarity is None
+
+
+def test_teach_good_appends_multiple_images(controller):
+    frame1 = make_textured_pattern(seed=1)
+    controller.process({"frame": frame1})
+    controller.teach_good(0, 0, 200, 200)
+
+    frame2 = make_textured_pattern(seed=3)
+    controller.last_frame = frame2
+    result = controller.teach_good(0, 0, 200, 200)
+
+    assert result is True
+    assert len(controller.good_references) == 2
+
+
+def test_teach_good_rejects_beyond_max_gallery_size(controller):
+    for seed in range(10, 15):
+        frame = make_textured_pattern(seed=seed)
+        controller.last_frame = frame
+        controller.teach_good(0, 0, 200, 200)
+
+    assert len(controller.good_references) == 5
+
+    overflow_frame = make_textured_pattern(seed=99)
+    controller.last_frame = overflow_frame
+    result = controller.teach_good(0, 0, 200, 200)
+
+    assert result is False
+    assert len(controller.good_references) == 5
+
+
+def test_remove_good_reference_by_index(controller):
+    frame1 = make_textured_pattern(seed=1)
+    controller.process({"frame": frame1})
+    controller.teach_good(0, 0, 200, 200)
+
+    frame2 = make_textured_pattern(seed=3)
+    controller.last_frame = frame2
+    controller.teach_good(0, 0, 200, 200)
+
+    assert len(controller.good_references) == 2
+
+    result = controller.remove_good_reference(0)
+
+    assert result is True
+    assert len(controller.good_references) == 1
+
+
+def test_remove_good_reference_invalid_index_returns_false(controller):
+    result = controller.remove_good_reference(0)
+    assert result is False
+
+
+def test_remove_good_reference_updates_teach_status(controller):
+    frame1 = make_textured_pattern(seed=1)
+    controller.process({"frame": frame1})
+    controller.teach_good(0, 0, 200, 200)
+
+    frame2 = make_textured_pattern(seed=2)
+    controller.last_frame = frame2
+    controller.teach_bad(0, 0, 200, 200)
+
+    assert controller.teach_status == "Taught"
+
+    controller.remove_bad_reference(0)
+
+    assert controller.teach_status == "Partial"
+
+
+def test_process_reports_reference_counts_in_result(controller):
+    good_frame = make_textured_pattern(seed=1)
+    controller.process({"frame": good_frame})
+    controller.teach_good(0, 0, 200, 200)
+
+    bad_frame = make_textured_pattern(seed=2)
+    controller.last_frame = bad_frame
+    controller.teach_bad(0, 0, 200, 200)
+
+    result = controller.process({"frame": good_frame})
+
+    assert result.good_reference_count == 1
+    assert result.bad_reference_count == 1

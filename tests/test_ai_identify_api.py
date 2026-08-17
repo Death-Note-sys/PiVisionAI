@@ -75,3 +75,29 @@ def test_reset_teaching_success(client, mock_ai_identify_service):
     response = client.post("/api/v1/ai-identify/reset-teaching")
 
     assert response.status_code == 200
+
+
+def test_remove_good_reference_success(client, mock_ai_identify_service):
+    mock_ai_identify_service.remove_good_reference.return_value = True
+
+    response = client.delete("/api/v1/ai-identify/good-reference/0")
+
+    assert response.status_code == 200
+    mock_ai_identify_service.remove_good_reference.assert_called_once_with(0)
+
+
+def test_remove_good_reference_failure_returns_500(client, mock_ai_identify_service):
+    mock_ai_identify_service.remove_good_reference.return_value = False
+
+    response = client.delete("/api/v1/ai-identify/good-reference/3")
+
+    assert response.status_code == 500
+
+
+def test_remove_bad_reference_success(client, mock_ai_identify_service):
+    mock_ai_identify_service.remove_bad_reference.return_value = True
+
+    response = client.delete("/api/v1/ai-identify/bad-reference/1")
+
+    assert response.status_code == 200
+    mock_ai_identify_service.remove_bad_reference.assert_called_once_with(1)
