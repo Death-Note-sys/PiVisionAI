@@ -43,6 +43,16 @@ class AIIdentifyService(IService):
             return self.module_ref.teach_bad(x, y, w, h)
         return False
 
+    def remove_good_reference(self, index: int) -> bool:
+        if self.module_ref and hasattr(self.module_ref, "remove_good_reference"):
+            return self.module_ref.remove_good_reference(index)
+        return False
+
+    def remove_bad_reference(self, index: int) -> bool:
+        if self.module_ref and hasattr(self.module_ref, "remove_bad_reference"):
+            return self.module_ref.remove_bad_reference(index)
+        return False
+
     def reset_teaching(self) -> bool:
         if self.module_ref and hasattr(self.module_ref, "reset_teaching"):
             return self.module_ref.reset_teaching()
@@ -64,5 +74,7 @@ class AIIdentifyService(IService):
                 "bad_similarity": r.bad_similarity,
                 "match_confidence": r.match_confidence,
                 "latency_ms": r.latency_ms,
+                "good_reference_count": len(self.module_ref.good_references) if hasattr(self.module_ref, "good_references") else 0,
+                "bad_reference_count": len(self.module_ref.bad_references) if hasattr(self.module_ref, "bad_references") else 0,
             }
         return status

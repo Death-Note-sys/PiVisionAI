@@ -69,6 +69,22 @@ class AIIdentifyService:
             return service.teach_bad(x, y, w, h)
         return False
 
+    def remove_good_reference(self, index: int) -> bool:
+        if not self._ensure_active():
+            return False
+        service = self.container.module_controller.get_active_service()
+        if service and hasattr(service, "remove_good_reference"):
+            return service.remove_good_reference(index)
+        return False
+
+    def remove_bad_reference(self, index: int) -> bool:
+        if not self._ensure_active():
+            return False
+        service = self.container.module_controller.get_active_service()
+        if service and hasattr(service, "remove_bad_reference"):
+            return service.remove_bad_reference(index)
+        return False
+
     def reset_teaching(self) -> bool:
         service = self.container.module_controller.get_active_service()
         if service and hasattr(service, "reset_teaching"):

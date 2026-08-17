@@ -109,6 +109,20 @@ def reset_teaching():
     return jsonify({"error": "Failed to reset teaching"}), 500
 
 
+@bp.route('/good-reference/<int:index>', methods=['DELETE'])
+def remove_good_reference(index):
+    if ai_identify_service.remove_good_reference(index):
+        return jsonify({"success": True})
+    return jsonify({"error": f"Failed to remove good reference at index {index}"}), 500
+
+
+@bp.route('/bad-reference/<int:index>', methods=['DELETE'])
+def remove_bad_reference(index):
+    if ai_identify_service.remove_bad_reference(index):
+        return jsonify({"success": True})
+    return jsonify({"error": f"Failed to remove bad reference at index {index}"}), 500
+
+
 @bp.route('/stream')
 def stream():
     """MJPEG stream of the rendered AI Identify output — shares OutputManager
