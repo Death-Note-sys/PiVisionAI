@@ -48,7 +48,7 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    padding: 0 16px;
+    padding: 6px 16px;
     background: var(--panel);
     border-bottom: 1px solid var(--hairline);
     gap: 12px;
@@ -82,6 +82,17 @@
     border-radius: 4px;
   }
 
+  input.toolbar-number {
+    width: 60px;
+    background: var(--panel-raised);
+    border: 1px solid var(--hairline);
+    color: var(--text-primary);
+    font-family: var(--font-data);
+    font-size: 12px;
+    padding: 6px 8px;
+    border-radius: 4px;
+  }
+
   .toolbar-spacer { flex: 1; }
 
   .backend-badge {
@@ -104,46 +115,6 @@
     background: var(--ok);
   }
 
-  /* ---------- Trigger controls ---------- */
-  .trigger-group {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-
-  .trigger-label {
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--text-muted);
-  }
-
-  #triggerIntervalInput {
-    width: 64px;
-    background: var(--panel-raised);
-    border: 1px solid var(--hairline);
-    color: var(--text-primary);
-    font-family: var(--font-data);
-    font-size: 12px;
-    padding: 5px 8px;
-    border-radius: 4px;
-  }
-
-  #fireTriggerBtn {
-    font-family: var(--font-ui);
-    font-size: 12px;
-    font-weight: 500;
-    padding: 5px 12px;
-    border-radius: 4px;
-    border: 1px solid var(--amber);
-    background: rgba(255,176,32,0.1);
-    color: var(--amber);
-    cursor: pointer;
-  }
-  #fireTriggerBtn:hover { background: rgba(255,176,32,0.2); }
-  #fireTriggerBtn:disabled { opacity: 0.35; cursor: not-allowed; }
-
   /* ---------- Main layout ---------- */
   .main {
     flex: 1;
@@ -151,7 +122,6 @@
     min-height: 0;
   }
 
-  /* Tool sidebar */
   .tool-rail {
     width: 56px;
     flex-shrink: 0;
@@ -312,7 +282,6 @@
   .vp-btn:hover { background: var(--panel-raised); }
   .vp-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
-  /* Calibration / Teach input overlay */
   .overlay-panel {
     position: absolute;
     top: 14px;
@@ -342,9 +311,8 @@
     border-radius: 4px;
   }
 
-  /* Inspector panel */
   .inspector {
-    width: 280px;
+    width: 300px;
     flex-shrink: 0;
     background: var(--panel);
     border-left: 1px solid var(--hairline);
@@ -365,6 +333,17 @@
     letter-spacing: 0.06em;
     color: var(--text-muted);
     margin: 0 0 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .inspector-title .count-badge {
+    font-family: var(--font-data);
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: 0;
+    color: var(--text-faint);
   }
 
   .stat-row {
@@ -462,51 +441,70 @@
   .full-btn.bad { border-color: var(--ng); background: rgba(255,92,92,0.12); color: var(--ng); }
   .full-btn.neutral { border-color: var(--hairline); background: var(--panel-raised); color: var(--text-muted); }
 
-  /* Teach reference thumbnails */
-  .teach-refs {
+  /* Multi-image teach gallery */
+  .gallery-label {
     display: flex;
-    gap: 8px;
-    margin: 10px 0;
+    justify-content: space-between;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    margin: 4px 0 6px;
   }
-  .teach-ref-slot {
-    flex: 1;
-    aspect-ratio: 1;
-    border-radius: 4px;
-    border: 1px dashed var(--hairline);
+  .gallery-label.good { color: var(--ok); }
+  .gallery-label.bad { color: var(--ng); }
+  .gallery-label .count { font-family: var(--font-data); font-weight: 400; color: var(--text-faint); }
+
+  .teach-gallery {
     display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+  }
+  .teach-thumb {
+    width: 48px;
+    height: 48px;
+    border-radius: 4px;
     position: relative;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .teach-thumb.empty {
+    border: 1px dashed var(--hairline);
     background: var(--panel-raised);
   }
-  .teach-ref-slot img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-  .teach-ref-slot .empty-label {
-    font-size: 10px;
-    color: var(--text-faint);
-    font-family: var(--font-data);
-  }
-  .teach-ref-slot .ref-tag {
+  .teach-thumb.filled.good { border: 2px solid var(--ok); }
+  .teach-thumb.filled.bad { border: 2px solid var(--ng); }
+  .teach-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .teach-thumb .del-btn {
     position: absolute;
-    top: 3px;
-    left: 3px;
-    font-size: 9px;
-    font-family: var(--font-data);
-    padding: 1px 5px;
-    border-radius: 3px;
+    top: 0; right: 0;
+    width: 16px; height: 16px;
     background: rgba(11,14,17,0.85);
+    color: var(--ng);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    font-size: 11px;
+    line-height: 1;
+    border-bottom-left-radius: 4px;
   }
-  .teach-ref-slot.good .ref-tag { color: var(--ok); }
-  .teach-ref-slot.bad .ref-tag { color: var(--ng); }
-  .teach-ref-slot.taught { border-style: solid; }
-  .teach-ref-slot.good.taught { border-color: var(--ok); }
-  .teach-ref-slot.bad.taught { border-color: var(--ng); }
+  .teach-thumb .del-btn:hover { background: var(--ng); color: var(--void); }
+  .teach-thumb .ref-num {
+    position: absolute;
+    bottom: 0; left: 0;
+    font-size: 8px;
+    font-family: var(--font-data);
+    color: var(--text-faint);
+    background: rgba(11,14,17,0.7);
+    padding: 0 3px;
+  }
 
-  /* Console */
+  .hint-text {
+    font-size: 11px;
+    color: var(--text-faint);
+    margin-top: 10px;
+    line-height: 1.5;
+  }
+
   .console {
     height: 140px;
     flex-shrink: 0;
@@ -570,19 +568,15 @@
       <option value="1280x720" selected>1280x720</option>
       <option value="1920x1080">1920x1080</option>
     </select>
-    <div class="toolbar-spacer"></div>
-    <div class="trigger-group">
-      <span class="trigger-label">Trigger</span>
-      <select class="module-select" id="triggerModeSelect" title="Trigger mode">
-        <option value="continuous" selected>Continuous</option>
-        <option value="single">Single</option>
-        <option value="interval">Interval</option>
-      </select>
-      <input type="number" id="triggerIntervalInput" value="5" min="0.1" step="0.5"
-             title="Interval (seconds)" class="hidden">
-      <button id="fireTriggerBtn" disabled title="Fire a single trigger shot"><i class="ti ti-bolt"></i> Fire</button>
-    </div>
     <div class="toolbar-divider"></div>
+    <select class="module-select" id="triggerModeSelect" title="Trigger mode">
+      <option value="continuous">Continuous</option>
+      <option value="single">Single Trigger</option>
+      <option value="interval">Interval</option>
+    </select>
+    <input type="number" id="triggerIntervalInput" class="toolbar-number hidden" min="0.5" step="0.5" value="5" title="Interval (seconds)">
+    <button class="vp-btn hidden" id="fireTriggerBtn"><i class="ti ti-bolt"></i>Fire</button>
+    <div class="toolbar-spacer"></div>
     <div class="backend-badge"><span class="dot"></span><span id="backendLabel">CPU backend</span></div>
   </div>
 
@@ -659,6 +653,8 @@
           <div class="stat-row"><span class="label">Good sim.</span><span class="value" id="statGoodSim">—</span></div>
           <div class="stat-row"><span class="label">Bad sim.</span><span class="value" id="statBadSim">—</span></div>
           <div class="stat-row"><span class="label">Match conf.</span><span class="value" id="statMatchConf">—</span></div>
+          <div class="stat-row"><span class="label">Matched ref #</span><span class="value accent" id="statMatchedRef">—</span></div>
+          <div class="stat-row"><span class="label">Gallery</span><span class="value" id="statGallerySize">0 good / 0 bad</span></div>
         </div>
       </div>
 
@@ -711,26 +707,18 @@
       </div>
 
       <div class="inspector-section ai-identify-only hidden">
-        <p class="inspector-title">Teach mode</p>
-        <div class="teach-refs">
-          <div class="teach-ref-slot good" id="goodRefSlot">
-            <span class="ref-tag">GOOD</span>
-            <span class="empty-label">Untaught</span>
-            <img class="hidden" id="goodRefImg" alt="Good reference">
-          </div>
-          <div class="teach-ref-slot bad" id="badRefSlot">
-            <span class="ref-tag">BAD</span>
-            <span class="empty-label">Untaught</span>
-            <img class="hidden" id="badRefImg" alt="Bad reference">
-          </div>
-        </div>
-        <button class="full-btn good" id="teachGoodBtn"><i class="ti ti-square-plus"></i> Teach Good</button>
-        <button class="full-btn bad" id="teachBadBtn" disabled><i class="ti ti-square-plus"></i> Teach Bad</button>
-        <button class="full-btn neutral" id="resetTeachBtn"><i class="ti ti-refresh"></i> Reset Teaching</button>
-        <p style="font-size:11px;color:var(--text-faint);margin-top:10px;line-height:1.5;">
-          Draw a tight box around the actual distinguishing feature, not the
-          whole part — this matters for accuracy.
-        </p>
+        <p class="inspector-title">Teach mode <span class="count-badge">max 5 per class</span></p>
+
+        <div class="gallery-label good"><span>GOOD</span><span class="count" id="goodCount">0/5</span></div>
+        <div class="teach-gallery" id="goodGallery"></div>
+        <button class="full-btn good" id="teachGoodBtn"><i class="ti ti-square-plus"></i> Add Good Image</button>
+
+        <div class="gallery-label bad" style="margin-top:14px;"><span>BAD</span><span class="count" id="badCount">0/5</span></div>
+        <div class="teach-gallery" id="badGallery"></div>
+        <button class="full-btn bad" id="teachBadBtn"><i class="ti ti-square-plus"></i> Add Bad Image</button>
+
+        <button class="full-btn neutral" id="resetTeachBtn" style="margin-top:14px;"><i class="ti ti-refresh"></i> Reset All Teaching</button>
+        <p class="hint-text">Teach 2-3 different angles per class for better accuracy. Draw tight boxes around the actual distinguishing feature, not the whole part.</p>
       </div>
     </div>
 
@@ -785,6 +773,11 @@ async function apiGet(path) {
   return res.json();
 }
 
+async function apiDelete(path) {
+  const res = await fetch(apiBase() + path, { method: 'DELETE' });
+  return res.json();
+}
+
 // ---------- Module switching ----------
 function setActiveModule(moduleId) {
   if (moduleId === activeModuleId) return;
@@ -809,9 +802,6 @@ function setActiveModule(moduleId) {
   document.getElementById('statStatus').textContent = 'Idle';
   const names = { 'core-object-detection': 'Object Detection', 'core-measurement': 'Measurement', 'core-ai-identify': 'AI Identify' };
   log('Switched to ' + names[moduleId]);
-  // Reset trigger UI to match backend's set_module() reset
-  document.getElementById('triggerModeSelect').value = 'continuous';
-  applyTriggerMode('continuous');
 }
 
 document.querySelectorAll('.tool-btn[data-module]').forEach(btn => {
@@ -833,9 +823,7 @@ async function switchCamera() {
     const result = await res.json();
     if (result.success) {
       log('Camera switched to index ' + index + ' @ ' + resolution, 'ok');
-      if (isStreamRunning) {
-        streamImg.src = apiBase() + '/stream?t=' + Date.now();
-      }
+      if (isStreamRunning) streamImg.src = apiBase() + '/stream?t=' + Date.now();
     } else {
       log('Camera switch failed: ' + (result.error || 'unknown error'), 'warn');
     }
@@ -845,6 +833,59 @@ async function switchCamera() {
 }
 document.getElementById('cameraIndexSelect').addEventListener('change', switchCamera);
 document.getElementById('cameraResolutionSelect').addEventListener('change', switchCamera);
+
+// ---------- Trigger Mode (shared, Pipeline-level, independent of active module) ----------
+const triggerModeSelect = document.getElementById('triggerModeSelect');
+const triggerIntervalInput = document.getElementById('triggerIntervalInput');
+const fireTriggerBtn = document.getElementById('fireTriggerBtn');
+
+triggerModeSelect.addEventListener('change', async (e) => {
+  const mode = e.target.value;
+  try {
+    const res = await fetch('/api/v1/trigger/mode', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode }),
+    });
+    const result = await res.json();
+    if (result.success) {
+      log('Trigger mode set to ' + mode, 'ok');
+      fireTriggerBtn.classList.toggle('hidden', mode === 'continuous');
+      triggerIntervalInput.classList.toggle('hidden', mode !== 'interval');
+      if (mode === 'interval') await setTriggerInterval();
+    } else {
+      log('Failed to set trigger mode: ' + (result.error || 'unknown error'), 'warn');
+    }
+  } catch (err) {
+    log('Trigger mode request failed: ' + err.message, 'warn');
+  }
+});
+
+async function setTriggerInterval() {
+  const seconds = parseFloat(triggerIntervalInput.value);
+  if (!seconds || seconds <= 0) return;
+  try {
+    const res = await fetch('/api/v1/trigger/interval', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ seconds }),
+    });
+    const result = await res.json();
+    if (result.success) log('Trigger interval set to ' + seconds + 's', 'ok');
+  } catch (err) {
+    log('Set interval failed: ' + err.message, 'warn');
+  }
+}
+triggerIntervalInput.addEventListener('change', setTriggerInterval);
+
+fireTriggerBtn.addEventListener('click', async () => {
+  try {
+    const res = await fetch('/api/v1/trigger/fire', { method: 'POST' });
+    const result = await res.json();
+    if (result.success) log('Trigger fired', 'ok');
+    else log('Fire failed: ' + (result.error || 'unknown error'), 'warn');
+  } catch (err) {
+    log('Fire request failed: ' + err.message, 'warn');
+  }
+});
 
 // ---------- Stream start/stop ----------
 async function startStream() {
@@ -909,6 +950,18 @@ function beginPolling() {
         document.getElementById('statGoodSim').textContent = telemetry.good_similarity != null ? telemetry.good_similarity.toFixed(4) : '—';
         document.getElementById('statBadSim').textContent = telemetry.bad_similarity != null ? telemetry.bad_similarity.toFixed(4) : '—';
         document.getElementById('statMatchConf').textContent = telemetry.match_confidence != null ? telemetry.match_confidence.toFixed(4) : '—';
+
+        let matchedRefText = '—';
+        if (telemetry.classification === 'Good' && telemetry.good_reference_index != null) {
+          matchedRefText = 'Good #' + telemetry.good_reference_index;
+        } else if (telemetry.classification === 'Bad' && telemetry.bad_reference_index != null) {
+          matchedRefText = 'Bad #' + telemetry.bad_reference_index;
+        }
+        document.getElementById('statMatchedRef').textContent = matchedRefText;
+
+        const goodCount = telemetry.good_reference_count ?? 0;
+        const badCount = telemetry.bad_reference_count ?? 0;
+        document.getElementById('statGallerySize').textContent = goodCount + ' good / ' + badCount + ' bad';
       }
     } catch (e) { /* status endpoint not ready yet */ }
   }, 1500);
@@ -1115,12 +1168,7 @@ document.getElementById('calibrationCancelBtn').addEventListener('click', () => 
 calibrateBtn.addEventListener('click', startCalibration);
 document.getElementById('openCalibrateBtn').addEventListener('click', startCalibration);
 
-// ---------- AI Identify teach workflow ----------
-// Unlike calibration (2-point click for a line), teaching needs a
-// drag-rectangle: mousedown -> mousemove (live preview) -> mouseup (confirm
-// box). Good and Bad are taught in SEPARATE freeze/capture cycles, since in
-// real use they are physically different objects placed one at a time —
-// there is no single frame containing both.
+// ---------- AI Identify multi-image teach workflow ----------
 const teachCanvas = document.getElementById('teachCanvas');
 const teachPanel = document.getElementById('teachPanel');
 const teachHint = document.getElementById('teachHint');
@@ -1132,30 +1180,79 @@ const teachBadBtn = document.getElementById('teachBadBtn');
 const resetTeachBtn = document.getElementById('resetTeachBtn');
 const teachCtx = teachCanvas.getContext('2d');
 
-let teachTarget = null;       // 'good' | 'bad' | null
+const MAX_REFS = 5;
+let teachTarget = null;
 let teachFrozenImg = null;
-let teachRect = null;         // {x,y,w,h} in canvas-native coords
+let teachRect = null;
 let isDraggingTeachBox = false;
 let dragStart = null;
-let goodTaught = false;
-let badTaught = false;
+
+// Local thumbnail cache — server never stores/returns images, so the
+// gallery UI is entirely client-side, cropped from the same frozen frame
+// used for teaching. Index in these arrays matches the server-side
+// reference index used by DELETE /good-reference/<i> and /bad-reference/<i>.
+let goodThumbnails = [];
+let badThumbnails = [];
+
+function renderGallery(containerEl, thumbnails, cls) {
+  containerEl.innerHTML = '';
+  for (let i = 0; i < MAX_REFS; i++) {
+    const slot = document.createElement('div');
+    if (i < thumbnails.length) {
+      slot.className = 'teach-thumb filled ' + cls;
+      const img = document.createElement('img');
+      img.src = thumbnails[i];
+      slot.appendChild(img);
+      const del = document.createElement('div');
+      del.className = 'del-btn';
+      del.textContent = '×';
+      del.addEventListener('click', () => removeReference(cls, i));
+      slot.appendChild(del);
+      const num = document.createElement('div');
+      num.className = 'ref-num';
+      num.textContent = '#' + i;
+      slot.appendChild(num);
+    } else {
+      slot.className = 'teach-thumb empty';
+    }
+    containerEl.appendChild(slot);
+  }
+  const countEl = document.getElementById(cls + 'Count');
+  countEl.textContent = thumbnails.length + '/' + MAX_REFS;
+  const btn = cls === 'good' ? teachGoodBtn : teachBadBtn;
+  btn.disabled = thumbnails.length >= MAX_REFS;
+}
 
 function resetTeachUIState() {
-  goodTaught = false;
-  badTaught = false;
-  document.getElementById('goodRefImg').classList.add('hidden');
-  document.getElementById('badRefImg').classList.add('hidden');
-  document.querySelectorAll('.teach-ref-slot .empty-label').forEach(el => el.classList.remove('hidden'));
-  document.getElementById('goodRefSlot').classList.remove('taught');
-  document.getElementById('badRefSlot').classList.remove('taught');
-  teachBadBtn.disabled = true;
+  goodThumbnails = [];
+  badThumbnails = [];
+  renderGallery(document.getElementById('goodGallery'), goodThumbnails, 'good');
+  renderGallery(document.getElementById('badGallery'), badThumbnails, 'bad');
   cancelTeach();
+}
+
+async function removeReference(cls, index) {
+  const path = '/' + cls + '-reference/' + index;
+  const result = await apiDelete(path);
+  if (result.success) {
+    if (cls === 'good') goodThumbnails.splice(index, 1);
+    else badThumbnails.splice(index, 1);
+    renderGallery(document.getElementById(cls + 'Gallery'), cls === 'good' ? goodThumbnails : badThumbnails, cls);
+    log(cls + ' reference #' + index + ' removed', 'ok');
+  } else {
+    log('Failed to remove ' + cls + ' reference: ' + (result.error || 'unknown error'), 'warn');
+  }
 }
 
 function startTeach(target) {
   if (activeModuleId !== 'core-ai-identify') return;
   if (!isStreamRunning) {
     log('Start the stream before teaching', 'warn');
+    return;
+  }
+  const currentCount = target === 'good' ? goodThumbnails.length : badThumbnails.length;
+  if (currentCount >= MAX_REFS) {
+    log(target + ' gallery is full (max ' + MAX_REFS + ') — remove one first', 'warn');
     return;
   }
   cancelCalibration();
@@ -1173,11 +1270,11 @@ function startTeach(target) {
   teachCanvas.classList.remove('hidden');
   teachPanel.classList.remove('hidden');
   teachPanel.className = 'overlay-panel teach-' + target;
-  teachHint.textContent = 'Drag a tight box around the ' + target.toUpperCase() + ' feature';
+  teachHint.textContent = 'Drag a tight box around the ' + target.toUpperCase() + ' feature (' + (currentCount + 1) + '/' + MAX_REFS + ')';
   teachRetryBtn.classList.add('hidden');
   teachConfirmBtn.classList.add('hidden');
   scanline.classList.add('paused');
-  log('Teach ' + target + ': frame frozen. Drag a box around the feature.');
+  log('Teach ' + target + ' #' + currentCount + ': frame frozen. Drag a box around the feature.');
 }
 
 function redrawTeachOverlay() {
@@ -1258,22 +1355,13 @@ teachConfirmBtn.addEventListener('click', async () => {
     const thumbDataUrl = thumbCanvas.toDataURL('image/png');
 
     if (teachTarget === 'good') {
-      goodTaught = true;
-      const img = document.getElementById('goodRefImg');
-      img.src = thumbDataUrl;
-      img.classList.remove('hidden');
-      document.querySelector('#goodRefSlot .empty-label').classList.add('hidden');
-      document.getElementById('goodRefSlot').classList.add('taught');
-      teachBadBtn.disabled = false;
-      log('Good reference taught. Swap in the Bad object, then click "Teach Bad".', 'ok');
+      goodThumbnails.push(thumbDataUrl);
+      renderGallery(document.getElementById('goodGallery'), goodThumbnails, 'good');
+      log('Good reference #' + (goodThumbnails.length - 1) + ' taught (' + goodThumbnails.length + '/' + MAX_REFS + ')', 'ok');
     } else {
-      badTaught = true;
-      const img = document.getElementById('badRefImg');
-      img.src = thumbDataUrl;
-      img.classList.remove('hidden');
-      document.querySelector('#badRefSlot .empty-label').classList.add('hidden');
-      document.getElementById('badRefSlot').classList.add('taught');
-      log('Bad reference taught. Teach status: Taught.', 'ok');
+      badThumbnails.push(thumbDataUrl);
+      renderGallery(document.getElementById('badGallery'), badThumbnails, 'bad');
+      log('Bad reference #' + (badThumbnails.length - 1) + ' taught (' + badThumbnails.length + '/' + MAX_REFS + ')', 'ok');
     }
 
     endTeach();
@@ -1316,75 +1404,6 @@ resetTeachBtn.addEventListener('click', async () => {
 });
 
 document.getElementById('consoleClear').addEventListener('click', () => { consoleBody.innerHTML = ''; });
-
-// ---------- Trigger mode ----------
-const triggerModeSelect = document.getElementById('triggerModeSelect');
-const triggerIntervalInput = document.getElementById('triggerIntervalInput');
-const fireTriggerBtn = document.getElementById('fireTriggerBtn');
-
-async function applyTriggerMode(mode) {
-  triggerIntervalInput.classList.toggle('hidden', mode !== 'interval');
-  fireTriggerBtn.disabled = (mode === 'continuous');
-
-  try {
-    const res = await fetch('/api/v1/trigger/mode', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mode }),
-    });
-    const result = await res.json();
-    if (result.success) {
-      log('Trigger mode: ' + mode, 'ok');
-      if (mode === 'interval') {
-        const secs = parseFloat(triggerIntervalInput.value);
-        await setTriggerInterval(secs);
-      }
-    } else {
-      log('Trigger mode change failed: ' + (result.error || 'unknown'), 'warn');
-    }
-  } catch (e) {
-    log('Trigger request failed: ' + e.message, 'warn');
-  }
-}
-
-async function setTriggerInterval(seconds) {
-  try {
-    const res = await fetch('/api/v1/trigger/interval', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ seconds }),
-    });
-    const result = await res.json();
-    if (result.success) {
-      log('Trigger interval: ' + seconds + 's', 'ok');
-    } else {
-      log('Set interval failed: ' + (result.error || 'unknown'), 'warn');
-    }
-  } catch (e) {
-    log('Interval request failed: ' + e.message, 'warn');
-  }
-}
-
-triggerModeSelect.addEventListener('change', () => applyTriggerMode(triggerModeSelect.value));
-
-triggerIntervalInput.addEventListener('change', () => {
-  const secs = parseFloat(triggerIntervalInput.value);
-  if (secs > 0) setTriggerInterval(secs);
-});
-
-fireTriggerBtn.addEventListener('click', async () => {
-  try {
-    const res = await fetch('/api/v1/trigger/fire', { method: 'POST' });
-    const result = await res.json();
-    if (result.success) {
-      log('Trigger fired', 'ok');
-    } else {
-      log('Fire failed: ' + (result.error || 'unknown'), 'warn');
-    }
-  } catch (e) {
-    log('Fire request failed: ' + e.message, 'warn');
-  }
-});
 
 log('Pi Vision AI workspace ready');
 log('Object Detection, Measurement, and AI Identify modules registered', 'ok');
