@@ -1,0 +1,6 @@
+{
+  "probe_heads_1.jpg":  {"expected": "Good",        "note": "Washington quarter obverse (heads) — same face as good reference, different photo"},
+  "probe_tails_1.jpg":  {"expected": "Bad",         "note": "Quarter reverse (tails) — same face as bad reference, different photo"},
+  "probe_ambiguous.jpg":{"expected": "Uncertain",   "note": "Quarter at an oblique angle — both reference faces partially visible, edge case for Uncertain branch"},
+  "probe_unrelated.jpg":{"expected": "NOT LOCATED", "note": "Banana — completely unrelated object, system should refuse to classify"}
+}

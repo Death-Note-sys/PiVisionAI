@@ -145,19 +145,19 @@ def test_teach_good_appends_multiple_images(controller):
 
 
 def test_teach_good_rejects_beyond_max_gallery_size(controller):
-    for seed in range(10, 15):
+    for seed in range(10, 30):
         frame = make_textured_pattern(seed=seed)
         controller.last_frame = frame
         controller.teach_good(0, 0, 200, 200)
 
-    assert len(controller.good_references) == 5
+    assert len(controller.good_references) == 20
 
     overflow_frame = make_textured_pattern(seed=99)
     controller.last_frame = overflow_frame
     result = controller.teach_good(0, 0, 200, 200)
 
     assert result is False
-    assert len(controller.good_references) == 5
+    assert len(controller.good_references) == 20
 
 
 def test_remove_good_reference_by_index(controller):
@@ -211,3 +211,28 @@ def test_process_reports_reference_counts_in_result(controller):
 
     assert result.good_reference_count == 1
     assert result.bad_reference_count == 1
+
+
+def test_single_match_below_similarity_floor_returns_uncertain(controller):
+    """A weak geometric match with low appearance similarity should not be
+    confidently classified — this is the exact failure mode the coin
+    benchmark exposed: an unrelated probe matched Good's geometry weakly
+    enough that SSIM was near-noise, but was still reported as a confident
+    'Good' before this fix."""
+    good_frame = make_textured_pattern(seed=1)
+    controller.process({"frame": good_frame})
+    controller.teach_good(0, 0, 200, 200)
+
+    bad_frame = make_textured_pattern(seed=2)
+    controller.last_frame = bad_frame
+    controller.teach_bad(0, 0, 200, 200)
+
+    # Directly exercise the floor logic without depending on ORB producing
+    # a specific weak-but-valid match on synthetic data, which isn't
+    # reliably reproducible. Lower the floor above what a self-match
+    # scores, and confirm classification flips to Uncertain.
+    controller.settings.update({"min_confident_similarity": 1.1})
+    result = controller.process({"frame": good_frame})
+
+    assert result.located is True
+    assert result.classification == "Uncertain"

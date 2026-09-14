@@ -24,7 +24,7 @@ class AIIdentifyController(IModule):
         self.teach_status = "Untaught"
         self.good_references: list = []  # each: {"image", "keypoints", "descriptors"}
         self.bad_references: list = []
-        self.MAX_REFERENCES_PER_CLASS = 5
+        self.MAX_REFERENCES_PER_CLASS = 20
 
         self.orb = cv2.ORB_create(nfeatures=1000)
         self.matcher = cv2.BFMatcher(cv2.NORM_HAMMING)
@@ -233,11 +233,19 @@ class AIIdentifyController(IModule):
                 self.last_result = result
                 return result
 
+            min_confident_similarity = settings.get("min_confident_similarity", 0.4)
+
             if good_match and not bad_match:
-                classification = "Good"
+                if good_match["ssim_score"] < min_confident_similarity:
+                    classification = "Uncertain"
+                else:
+                    classification = "Good"
                 chosen = good_match
             elif bad_match and not good_match:
-                classification = "Bad"
+                if bad_match["ssim_score"] < min_confident_similarity:
+                    classification = "Uncertain"
+                else:
+                    classification = "Bad"
                 chosen = bad_match
             else:
                 good_score = good_match["ssim_score"]

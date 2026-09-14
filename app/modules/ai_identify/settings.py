@@ -6,6 +6,7 @@ class AIIdentifySettingsModel(BaseModel):
     min_match_count: int = 10
     match_ratio_threshold: float = 0.75
     classification_margin: float = 0.05
+    min_confident_similarity: float = 0.4
     show_bbox: bool = True
     show_classification: bool = True
     thickness: int = 2

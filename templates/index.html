@@ -459,10 +459,13 @@
     gap: 6px;
     flex-wrap: wrap;
     margin-bottom: 8px;
+    max-height: 168px;
+    overflow-y: auto;
+    padding-right: 2px;
   }
   .teach-thumb {
-    width: 48px;
-    height: 48px;
+    width: 36px;
+    height: 36px;
     border-radius: 4px;
     position: relative;
     overflow: hidden;
@@ -707,7 +710,7 @@
       </div>
 
       <div class="inspector-section ai-identify-only hidden">
-        <p class="inspector-title">Teach mode <span class="count-badge">max 5 per class</span></p>
+        <p class="inspector-title">Teach mode <span class="count-badge">max 20 per class</span></p>
 
         <div class="gallery-label good"><span>GOOD</span><span class="count" id="goodCount">0/5</span></div>
         <div class="teach-gallery" id="goodGallery"></div>
@@ -1180,7 +1183,7 @@ const teachBadBtn = document.getElementById('teachBadBtn');
 const resetTeachBtn = document.getElementById('resetTeachBtn');
 const teachCtx = teachCanvas.getContext('2d');
 
-const MAX_REFS = 5;
+const MAX_REFS = 20;
 let teachTarget = null;
 let teachFrozenImg = null;
 let teachRect = null;
