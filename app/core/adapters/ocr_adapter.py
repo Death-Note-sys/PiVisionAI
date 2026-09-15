@@ -31,9 +31,10 @@ class OcrAdapter(BaseAdapter):
 
         frame = input_data.get("frame")
         min_confidence = input_data.get("min_confidence", 0.3)
+        canvas_size = input_data.get("canvas_size", 2560)
 
         start_time = time.perf_counter()
-        raw_results = self.model.readtext(frame)
+        raw_results = self.model.readtext(frame, canvas_size=canvas_size)
         end_time = time.perf_counter()
 
         texts = []

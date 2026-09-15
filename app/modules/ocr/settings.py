@@ -8,6 +8,7 @@ class OCRSettingsModel(BaseModel):
     show_confidence: bool = True
     thickness: int = 2
     model_id: str = "easyocr"
+    canvas_size: int = 960
 
 class OCRSettings(ISettingsProvider):
     def __init__(self):

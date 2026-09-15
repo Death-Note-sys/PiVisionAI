@@ -45,5 +45,6 @@ class OCRService(IService):
                 "text_count": len(r.texts),
                 "latency_ms": r.latency_ms,
                 "model_name": r.model_name,
+                "texts": [{"text": t.get("text", ""), "confidence": t.get("confidence", 0)} for t in r.texts],
             }
         return status

@@ -7,6 +7,7 @@ class UpdateOCRSettingsRequest(BaseModel):
     show_confidence: Optional[bool] = None
     thickness: Optional[int] = Field(None, ge=1, le=10)
     model_id: Optional[str] = None
+    canvas_size: Optional[int] = Field(None, ge=320, le=2560)
 
     def to_update_dict(self) -> Dict[str, Any]:
         return self.model_dump(exclude_none=True)

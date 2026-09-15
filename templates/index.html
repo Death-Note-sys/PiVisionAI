@@ -508,6 +508,33 @@
     line-height: 1.5;
   }
 
+  .ocr-text-list {
+    max-height: 160px;
+    overflow-y: auto;
+    margin-top: 8px;
+    border: 1px solid var(--hairline);
+    border-radius: 4px;
+  }
+  .ocr-text-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--hairline);
+    font-family: var(--font-data);
+    font-size: 12px;
+  }
+  .ocr-text-row:last-child { border-bottom: none; }
+  .ocr-text-value { color: var(--text-primary); word-break: break-all; }
+  .ocr-text-conf { color: var(--cyan); flex-shrink: 0; margin-left: 8px; }
+  .ocr-empty {
+    padding: 12px 8px;
+    color: var(--text-faint);
+    font-size: 11px;
+    text-align: center;
+    font-family: var(--font-data);
+  }
+
   .console {
     height: 140px;
     flex-shrink: 0;
@@ -560,6 +587,7 @@
       <option value="core-object-detection">Object Detection</option>
       <option value="core-measurement">Measurement</option>
       <option value="core-ai-identify">AI Identify</option>
+      <option value="core-ocr">OCR</option>
     </select>
     <div class="toolbar-divider"></div>
     <select class="module-select" id="cameraIndexSelect" title="Camera source">
@@ -590,7 +618,7 @@
       <div class="tool-btn" data-module="core-measurement" title="Measurement"><i class="ti ti-ruler-2"></i></div>
       <div class="tool-btn" data-module="core-ai-identify" title="AI Identify"><i class="ti ti-focus-2"></i></div>
       <div class="tool-btn disabled" title="Color analysis (coming soon)"><i class="ti ti-color-swatch"></i></div>
-      <div class="tool-btn disabled" title="OCR (works, slow on CPU — enable manually)"><i class="ti ti-abc"></i></div>
+      <div class="tool-btn" data-module="core-ocr" title="OCR"><i class="ti ti-abc"></i></div>
       <div class="tool-btn disabled" title="Motion (coming soon)"><i class="ti ti-wave-sine"></i></div>
       <div class="tool-btn disabled" title="Shape (coming soon)"><i class="ti ti-shape"></i></div>
     </div>
@@ -723,6 +751,33 @@
         <button class="full-btn neutral" id="resetTeachBtn" style="margin-top:14px;"><i class="ti ti-refresh"></i> Reset All Teaching</button>
         <p class="hint-text">Teach 2-3 different angles per class for better accuracy. Draw tight boxes around the actual distinguishing feature, not the whole part.</p>
       </div>
+
+      <div class="inspector-section ocr-only hidden">
+        <p class="inspector-title">OCR readout</p>
+        <div class="stat-row"><span class="label">Model</span><span class="value" id="statOcrModel">—</span></div>
+        <div class="stat-row"><span class="label">Texts found</span><span class="value accent" id="statOcrCount">0</span></div>
+        <div class="stat-row"><span class="label">Latency</span><span class="value" id="statOcrLatency">— ms</span></div>
+        <div class="ocr-text-list" id="ocrTextList">
+          <div class="ocr-empty">No text captured yet</div>
+        </div>
+        <p class="hint-text">EasyOCR is slow per-frame on CPU (10-25s). Use Single or Interval trigger mode (top toolbar), not Continuous.</p>
+      </div>
+
+      <div class="inspector-section ocr-only hidden">
+        <p class="inspector-title">OCR settings</p>
+        <div class="field">
+          <div class="field-label"><span>Min confidence</span><span class="field-value" id="ocrConfVal">0.30</span></div>
+          <input type="range" id="ocrConfSlider" min="0.05" max="0.95" step="0.05" value="0.3">
+        </div>
+        <div class="toggle-row">
+          <span>Show text</span>
+          <div class="switch on" id="ocrShowTextToggle"></div>
+        </div>
+        <div class="toggle-row">
+          <span>Show confidence</span>
+          <div class="switch on" id="ocrShowConfToggle"></div>
+        </div>
+      </div>
     </div>
 
   </div>
@@ -742,6 +797,7 @@ const API_BASES = {
   'core-object-detection': '/api/v1/object-detection',
   'core-measurement': '/api/v1/measurement',
   'core-ai-identify': '/api/v1/ai-identify',
+  'core-ocr': '/api/v1/ocr',
 };
 function apiBase() { return API_BASES[activeModuleId]; }
 
@@ -798,9 +854,14 @@ function setActiveModule(moduleId) {
   document.querySelectorAll('.detection-only').forEach(el => el.classList.toggle('hidden', moduleId !== 'core-object-detection'));
   document.querySelectorAll('.measurement-only').forEach(el => el.classList.toggle('hidden', moduleId !== 'core-measurement'));
   document.querySelectorAll('.ai-identify-only').forEach(el => el.classList.toggle('hidden', moduleId !== 'core-ai-identify'));
+  document.querySelectorAll('.ocr-only').forEach(el => el.classList.toggle('hidden', moduleId !== 'core-ocr'));
   calibrateBtn.classList.toggle('hidden', moduleId !== 'core-measurement');
 
   if (moduleId === 'core-ai-identify') resetTeachUIState();
+
+  if (moduleId === 'core-ocr' && triggerModeSelect.value === 'continuous') {
+    log('OCR is slow per-frame on CPU — switch Trigger Mode (top toolbar) to Single or Interval instead of Continuous.', 'warn');
+  }
 
   document.getElementById('statStatus').textContent = 'Idle';
   const names = { 'core-object-detection': 'Object Detection', 'core-measurement': 'Measurement', 'core-ai-identify': 'AI Identify' };
@@ -965,6 +1026,26 @@ function beginPolling() {
         const goodCount = telemetry.good_reference_count ?? 0;
         const badCount = telemetry.bad_reference_count ?? 0;
         document.getElementById('statGallerySize').textContent = goodCount + ' good / ' + badCount + ' bad';
+
+      } else if (activeModuleId === 'core-ocr') {
+        document.getElementById('statOcrModel').textContent = telemetry.model_name || '—';
+        document.getElementById('statOcrCount').textContent = telemetry.text_count ?? 0;
+        document.getElementById('statOcrLatency').textContent = telemetry.latency_ms != null ? telemetry.latency_ms.toFixed(0) + ' ms' : '— ms';
+
+        const listEl = document.getElementById('ocrTextList');
+        listEl.innerHTML = '';
+        const texts = telemetry.texts || [];
+        if (texts.length === 0) {
+          listEl.innerHTML = '<div class="ocr-empty">No text captured yet</div>';
+        } else {
+          texts.forEach(t => {
+            const row = document.createElement('div');
+            row.className = 'ocr-text-row';
+            row.innerHTML = '<span class="ocr-text-value">' + t.text.replace(/</g, '&lt;') + '</span>' +
+                             '<span class="ocr-text-conf">' + t.confidence.toFixed(2) + '</span>';
+            listEl.appendChild(row);
+          });
+        }
       }
     } catch (e) { /* status endpoint not ready yet */ }
   }, 1500);
@@ -1037,6 +1118,16 @@ document.getElementById('unitSelect').addEventListener('change', async (e) => {
 });
 
 wireToggle('showDimsToggle', 'show_dimensions');
+
+    const ocrConfSlider = document.getElementById('ocrConfSlider');
+    const ocrConfVal = document.getElementById('ocrConfVal');
+    ocrConfSlider.addEventListener('input', () => { ocrConfVal.textContent = parseFloat(ocrConfSlider.value).toFixed(2); });
+    ocrConfSlider.addEventListener('change', async () => {
+      await apiPost('/settings', { min_confidence: parseFloat(ocrConfSlider.value) });
+      log('OCR min confidence set to ' + ocrConfSlider.value);
+    });
+    wireToggle('ocrShowTextToggle', 'show_text');
+    wireToggle('ocrShowConfToggle', 'show_confidence');
 
 // ---------- Measurement calibration workflow ----------
 const calibrationCanvas = document.getElementById('calibrationCanvas');

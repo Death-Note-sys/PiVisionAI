@@ -29,11 +29,13 @@ class OCRController(IModule):
 
     def process(self, context: Dict[str, Any]) -> OCRResult:
         frame = context["frame"]
-        min_confidence = self.settings.get_settings().get("min_confidence", 0.3)
+        settings = self.settings.get_settings()
+        min_confidence = settings.get("min_confidence", 0.3)
+        canvas_size = settings.get("canvas_size", 960)
 
         try:
             adapter_result = self.ai_runtime.predict(
-                self.active_model_id, {"frame": frame, "min_confidence": min_confidence}
+                self.active_model_id, {"frame": frame, "min_confidence": min_confidence, "canvas_size": canvas_size}
             )
         except Exception as e:
             logger.error(f"OCR inference failed: {e}")
