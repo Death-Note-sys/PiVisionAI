@@ -1,0 +1,3 @@
+{
+  "example_probe.jpg": {"expected": "REPLACE ME", "match_type": "contains"}
+}
