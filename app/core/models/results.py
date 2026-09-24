@@ -43,6 +43,10 @@ class OCRResult(ModuleResult):
 class ColorResult(ModuleResult):
     """Standardized result for Color Analysis."""
     dominant_colors: List[Dict[str, Any]] = Field(default_factory=list)
+    reference_status: str = "Untaught"  # "Untaught" | "Taught"
+    reference_color: Optional[Dict[str, Any]] = None
+    delta_e: Optional[float] = None
+    match: Optional[bool] = None
 
 class MotionResult(ModuleResult):
     """Standardized result for Motion Detection."""

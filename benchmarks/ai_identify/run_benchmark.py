@@ -72,8 +72,8 @@ def teach_from_folder(controller, folder, teach_fn, label, crop_overrides):
     for name, img in images:
         controller.last_frame = img
         h, w = img.shape[:2]
-        if name in crop_overrides:
-            box = crop_overrides[name]
+        box = crop_overrides.get(name, {})
+        if box and "x" in box:
             x, y, cw, ch = box["x"], box["y"], box["w"], box["h"]
             crop_note = f" (cropped {cw}x{ch} @ {x},{y})"
         else:

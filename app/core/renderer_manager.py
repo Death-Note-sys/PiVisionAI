@@ -5,6 +5,7 @@ from app.core.renderers.detection_renderer import DetectionRenderer
 from app.core.renderers.measurement_renderer import MeasurementRenderer
 from app.core.renderers.ocr_renderer import OCRRenderer
 from app.core.renderers.ai_identify_renderer import AIIdentifyRenderer
+from app.core.renderers.color_analysis_renderer import ColorAnalysisRenderer
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +22,7 @@ class RendererManager:
         self.renderers["measurement"] = MeasurementRenderer()
         self.renderers["ocr"] = OCRRenderer()
         self.renderers["ai_identify"] = AIIdentifyRenderer()
+        self.renderers["color_analysis"] = ColorAnalysisRenderer()
         # Other renderers can be registered dynamically
         
     def switch_renderer(self, renderer_name: str) -> bool:

@@ -2,18 +2,17 @@ from typing import Dict, Any
 from app.core.contracts import ISettingsProvider
 from pydantic import BaseModel
 
-class AIIdentifySettingsModel(BaseModel):
-    min_match_count: int = 10
-    match_ratio_threshold: float = 0.75
-    classification_margin: float = 0.05
-    min_confident_similarity: float = 0.35
-    show_bbox: bool = True
-    show_classification: bool = True
+class ColorAnalysisSettingsModel(BaseModel):
+    num_colors: int = 5
+    delta_e_threshold: float = 10.0
+    downsample_size: int = 100
+    show_dominant_colors: bool = True
+    show_reference_match: bool = True
     thickness: int = 2
 
-class AIIdentifySettings(ISettingsProvider):
+class ColorAnalysisSettings(ISettingsProvider):
     def __init__(self):
-        self._settings = AIIdentifySettingsModel()
+        self._settings = ColorAnalysisSettingsModel()
 
     def get_settings(self) -> Dict[str, Any]:
         return self._settings.model_dump()

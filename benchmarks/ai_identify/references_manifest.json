@@ -1,6 +1,8 @@
 {
   "good": {
-    "quarter_heads.jpg": {"x": 12, "y": 12, "w": 1120, "h": 1104}
+    "rupee2_coin.jpg": {"x": 164, "y": 320, "w": 400, "h": 400}
   },
-  "bad": {}
+  "bad": {
+    "rupee20_coin.jpg": {"x": 176, "y": 300, "w": 400, "h": 400}
+  }
 }

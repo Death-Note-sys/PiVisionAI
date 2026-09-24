@@ -1,3 +1,5 @@
 {
-  "example_probe.jpg": {"expected": "REPLACE ME", "match_type": "contains"}
+  "ocr_stop_sign.jpg":    {"expected": "stop",      "match_type": "contains"},
+  "ocr_caution_sign.jpg": {"expected": "caution",   "match_type": "contains"},
+  "ocr_speed_limit.jpg":  {"expected": "50",         "match_type": "contains"}
 }

@@ -1,6 +1,46 @@
 {
-  "probe_heads_1.jpg":  {"expected": "Good",        "note": "Washington quarter obverse (heads) — same face as good reference, different photo"},
-  "probe_tails_1.jpg":  {"expected": "Bad",         "note": "Quarter reverse (tails) — same face as bad reference, different photo"},
-  "probe_ambiguous.jpg":{"expected": "Uncertain",   "note": "Quarter at an oblique angle — both reference faces partially visible, edge case for Uncertain branch"},
-  "probe_unrelated.jpg":{"expected": "NOT LOCATED", "note": "Banana — completely unrelated object, system should refuse to classify"}
+  "probe_masterchow_lid.jpg": {
+    "expected": "NOT LOCATED",
+    "description": "Red plastic jar lid on the same steel platform and wooden background as the rupee coin references. Tests cross-object rejection with shared background."
+  },
+  "probe_unrelated.jpg": {
+    "expected": "NOT LOCATED",
+    "description": "Banana — completely different object and background. Easy cross-object rejection baseline."
+  },
+  "probe_rupee2_on_table.jpg": {
+    "expected": "Good",
+    "description": "₹2 coin photographed directly on wood (no steel platform). Same coin design as Good reference. Tests same-coin recognition across a background change."
+  },
+  "probe_rupee20_on_table.jpg": {
+    "expected": "Bad",
+    "description": "₹20 coin photographed directly on wood (no steel platform). Same coin design as Bad reference. Tests same-coin recognition across a background change."
+  },
+  "probe_wrong_coin.png": {
+    "expected": "NOT LOCATED",
+    "description": "US proof penny — completely different coin (denomination, design, country, colour). Should fail to locate against rupee references."
+  },
+  "probe_heads_1.jpg": {
+    "expected": "NOT LOCATED",
+    "description": "US Washington quarter (proof-style, white background). Completely different coin from rupee references. Cross-object rejection."
+  },
+  "probe_heads_2.jpg": {
+    "expected": "NOT LOCATED",
+    "description": "US quarter obverse (2022 proof, white background). Completely different coin from rupee references. Cross-object rejection."
+  },
+  "probe_tails_1.jpg": {
+    "expected": "NOT LOCATED",
+    "description": "US Florida quarter reverse (proof-style). Completely different coin from rupee references. Cross-object rejection."
+  },
+  "probe_tails_2.jpg": {
+    "expected": "NOT LOCATED",
+    "description": "US Crossing the Delaware quarter reverse. Completely different coin from rupee references. Cross-object rejection."
+  },
+  "probe_good.png": {
+    "expected": "NOT LOCATED",
+    "description": "Synthetic Gaussian-blurred fixed-seed texture (previous regression fixture). References are now real rupee coin photos — this texture has no match. Expected NOT LOCATED. Only valid as a fixture when references are matching synthetic textures."
+  },
+  "probe_bad.png": {
+    "expected": "NOT LOCATED",
+    "description": "Synthetic Gaussian-blurred fixed-seed texture (previous regression fixture). Same limitation as probe_good.png — references changed to real photos. Expected NOT LOCATED."
+  }
 }

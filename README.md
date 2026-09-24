@@ -266,7 +266,7 @@ This is an active personal project under continuous development. Modules vary in
 | Module | Status |
 |---|---|
 | Object Detection | ✅ Stable |
-| AI Identify | ✅ Stable |
+| AI Identify | ✅ Stable — cross-object rejection validated; same-object Good/Bad (one part, two physical states) not yet tested |
 | Measurement | ✅ Stable |
 | OCR | ✅ Working (CPU slow — use non-continuous trigger) |
 | Face Detection | ⚙️ Working |
@@ -274,6 +274,18 @@ This is an active personal project under continuous development. Modules vary in
 | Color Detector | ⚙️ Working |
 | Edge / Shape / Motion | 🔧 Beta |
 | Background Removal | 🔧 Beta |
+
+### AI Identify — Validation Detail
+
+What has been tested with real hardware photos (11-probe benchmark, `benchmarks/ai_identify/`):
+
+- **Cross-object rejection**: Different objects on the same background (jar lid on the same steel platform as both coin references) → correctly NOT LOCATED. ORB is not latching onto the shared background.
+- **Cross-denomination / cross-design rejection**: US quarters, US penny, and a different Indian rupee denomination all correctly NOT LOCATED against rupee references.
+- **Same-coin recognition across background change**: ₹2 and ₹20 probes photographed on a plain wooden table (no steel platform) vs references photographed on a steel platform → correctly classified Good/Bad. This is a cross-object test (two different coins), not a same-object test.
+- **`min_confident_similarity` floor**: The ₹20 probe scored 0.359 — one borderline data point that motivated lowering the default from 0.4 to 0.35. Known false positives (US penny: 0.104) remain well below the floor at 0.35. The floor change has been regression-tested against all 11 current probes and no new failures were introduced.
+
+What has **not** been tested:
+- **Same-object Good/Bad**: Teaching from one physical object in a "good" state and then correctly classifying the *same* object in a "defective" state (e.g. a mark, a missing component, a scratch). This is the core industrial use case and the one remaining open gap in AI Identify's validation.
 
 ---
 

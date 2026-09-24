@@ -1,0 +1,28 @@
+{
+    "id": "core-color-analysis",
+    "name": "Color Analysis",
+    "version": "1.0.0",
+    "author": "Pi Vision AI Core",
+    "description": "K-means dominant color extraction with optional taught-reference matching via CIE Delta-E in LAB space.",
+    "category": "Vision",
+    "task": "Color Analysis",
+    "entry_point": "plugin.py:ColorAnalysisPlugin",
+    "renderer": "color_analysis",
+    "api_version": "v1",
+    "supported_camera_types": ["rgb"],
+    "supported_results": ["ColorResult"],
+    "required_models": [],
+    "required_backends": [],
+    "optional_backends": [],
+    "permissions": ["camera"],
+    "dependencies": ["opencv-python", "numpy"],
+    "minimum_framework_version": "1.0.0",
+    "license": "MIT",
+    "settings_schema": {
+        "num_colors": {"type": "integer", "default": 5},
+        "delta_e_threshold": {"type": "float", "default": 10.0},
+        "downsample_size": {"type": "integer", "default": 100},
+        "show_dominant_colors": {"type": "boolean", "default": true},
+        "show_reference_match": {"type": "boolean", "default": true}
+    }
+}
