@@ -23,6 +23,7 @@ class ColorAnalysisController(IModule):
         self.reference_status = "Untaught"
         self.reference_lab: Optional[np.ndarray] = None
         self.reference_rgb: Optional[tuple] = None
+        self.reference_box: Optional[tuple] = None  # (x, y, w, h)
 
     def initialize(self) -> bool:
         logger.info("ColorAnalysisController initialized.")
@@ -58,6 +59,7 @@ class ColorAnalysisController(IModule):
         self.reference_lab = avg_lab.astype(np.float64)
         self.reference_rgb = (int(avg_bgr[2]), int(avg_bgr[1]), int(avg_bgr[0]))  # BGR -> RGB
         self.reference_status = "Taught"
+        self.reference_box = (x, y, w, h)
         self.event_bus.publish("ColorReferenceTaught", {"rgb": self.reference_rgb})
         return True
 
@@ -65,6 +67,7 @@ class ColorAnalysisController(IModule):
         self.reference_lab = None
         self.reference_rgb = None
         self.reference_status = "Untaught"
+        self.reference_box = None
         self.event_bus.publish("ColorReferenceReset", {})
         return True
 
@@ -111,12 +114,15 @@ class ColorAnalysisController(IModule):
 
         delta_e = None
         match = None
-        if self.reference_status == "Taught" and dominant_colors:
-            top_rgb = dominant_colors[0]["rgb"]
-            top_bgr_img = np.uint8([[[top_rgb[2], top_rgb[1], top_rgb[0]]]])
-            top_lab = cv2.cvtColor(top_bgr_img, cv2.COLOR_BGR2LAB)[0][0].astype(np.float64)
-            delta_e = float(np.linalg.norm(top_lab - self.reference_lab))
-            match = delta_e <= delta_e_threshold
+        if self.reference_status == "Taught" and self.reference_box is not None:
+            rx, ry, rw, rh = self.reference_box
+            live_crop = self._safe_crop(frame, rx, ry, rw, rh)
+            if live_crop is not None:
+                live_avg_bgr = live_crop.reshape(-1, 3).mean(axis=0)
+                live_avg_bgr_img = np.uint8([[live_avg_bgr]])
+                live_avg_lab = cv2.cvtColor(live_avg_bgr_img, cv2.COLOR_BGR2LAB)[0][0].astype(np.float64)
+                delta_e = float(np.linalg.norm(live_avg_lab - self.reference_lab))
+                match = delta_e <= delta_e_threshold
 
         result = ColorResult(
             dominant_colors=dominant_colors,

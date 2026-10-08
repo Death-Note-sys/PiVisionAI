@@ -535,6 +535,38 @@
     font-family: var(--font-data);
   }
 
+  .color-palette {
+    display: flex;
+    gap: 4px;
+    margin: 8px 0;
+  }
+  .palette-swatch {
+    width: 32px;
+    height: 32px;
+    border-radius: 4px;
+    border: 1px solid var(--hairline);
+    flex-shrink: 0;
+  }
+  .color-ref-swatch {
+    width: 100%;
+    height: 60px;
+    border-radius: 4px;
+    border: 1px dashed var(--hairline);
+    background-color: var(--panel-raised);
+    background-size: cover;
+    background-position: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 8px 0;
+  }
+  .color-ref-swatch.filled { border-style: solid; border-color: var(--cyan); }
+  .color-ref-swatch .empty-label {
+    font-size: 11px;
+    color: var(--text-faint);
+    font-family: var(--font-data);
+  }
+
   .console {
     height: 140px;
     flex-shrink: 0;
@@ -588,6 +620,7 @@
       <option value="core-measurement">Measurement</option>
       <option value="core-ai-identify">AI Identify</option>
       <option value="core-ocr">OCR</option>
+      <option value="core-color-analysis">Color Analysis</option>
     </select>
     <div class="toolbar-divider"></div>
     <select class="module-select" id="cameraIndexSelect" title="Camera source">
@@ -617,7 +650,7 @@
       <div class="tool-btn active" data-module="core-object-detection" title="Object detection"><i class="ti ti-box-multiple"></i></div>
       <div class="tool-btn" data-module="core-measurement" title="Measurement"><i class="ti ti-ruler-2"></i></div>
       <div class="tool-btn" data-module="core-ai-identify" title="AI Identify"><i class="ti ti-focus-2"></i></div>
-      <div class="tool-btn disabled" title="Color analysis (coming soon)"><i class="ti ti-color-swatch"></i></div>
+      <div class="tool-btn" data-module="core-color-analysis" title="Color Analysis"><i class="ti ti-color-swatch"></i></div>
       <div class="tool-btn" data-module="core-ocr" title="OCR"><i class="ti ti-abc"></i></div>
       <div class="tool-btn disabled" title="Motion (coming soon)"><i class="ti ti-wave-sine"></i></div>
       <div class="tool-btn disabled" title="Shape (coming soon)"><i class="ti ti-shape"></i></div>
@@ -778,6 +811,39 @@
           <div class="switch on" id="ocrShowConfToggle"></div>
         </div>
       </div>
+
+      <div class="inspector-section color-analysis-only hidden">
+        <p class="inspector-title">Color readout</p>
+        <div class="color-palette" id="colorPalette"></div>
+        <div class="stat-row"><span class="label">Reference</span><span class="value warn" id="statColorRefStatus">Untaught</span></div>
+        <div class="stat-row"><span class="label">Delta-E</span><span class="value" id="statDeltaE">—</span></div>
+        <div class="stat-row"><span class="label">Match</span><span class="value" id="statColorMatch">—</span></div>
+      </div>
+
+      <div class="inspector-section color-analysis-only hidden">
+        <p class="inspector-title">Color settings</p>
+        <div class="field">
+          <div class="field-label"><span>Number of colors</span><span class="field-value" id="numColorsVal">5</span></div>
+          <input type="range" id="numColorsSlider" min="1" max="10" step="1" value="5">
+        </div>
+        <div class="field">
+          <div class="field-label"><span>Delta-E threshold</span><span class="field-value" id="deltaEThresholdVal">25.0</span></div>
+          <input type="range" id="deltaEThresholdSlider" min="1" max="60" step="0.5" value="25">
+        </div>
+        <div class="toggle-row">
+          <span>Show dominant colors</span>
+          <div class="switch on" id="showColorsToggle"></div>
+        </div>
+        <div class="toggle-row">
+          <span>Show reference match</span>
+          <div class="switch on" id="showColorMatchToggle"></div>
+        </div>
+        <div class="color-ref-swatch" id="colorRefSwatch">
+          <span class="empty-label" id="colorRefEmptyLabel">No reference taught</span>
+        </div>
+        <button class="full-btn" id="setColorReferenceBtn"><i class="ti ti-eyedropper"></i> Set Reference Color</button>
+        <button class="full-btn neutral" id="resetColorReferenceBtn" style="margin-top:6px;"><i class="ti ti-refresh"></i> Reset Reference</button>
+      </div>
     </div>
 
   </div>
@@ -798,6 +864,7 @@ const API_BASES = {
   'core-measurement': '/api/v1/measurement',
   'core-ai-identify': '/api/v1/ai-identify',
   'core-ocr': '/api/v1/ocr',
+  'core-color-analysis': '/api/v1/color-analysis',
 };
 function apiBase() { return API_BASES[activeModuleId]; }
 
@@ -855,6 +922,7 @@ function setActiveModule(moduleId) {
   document.querySelectorAll('.measurement-only').forEach(el => el.classList.toggle('hidden', moduleId !== 'core-measurement'));
   document.querySelectorAll('.ai-identify-only').forEach(el => el.classList.toggle('hidden', moduleId !== 'core-ai-identify'));
   document.querySelectorAll('.ocr-only').forEach(el => el.classList.toggle('hidden', moduleId !== 'core-ocr'));
+  document.querySelectorAll('.color-analysis-only').forEach(el => el.classList.toggle('hidden', moduleId !== 'core-color-analysis'));
   calibrateBtn.classList.toggle('hidden', moduleId !== 'core-measurement');
 
   if (moduleId === 'core-ai-identify') resetTeachUIState();
@@ -1046,6 +1114,29 @@ function beginPolling() {
             listEl.appendChild(row);
           });
         }
+
+      } else if (activeModuleId === 'core-color-analysis') {
+        const paletteEl = document.getElementById('colorPalette');
+        paletteEl.innerHTML = '';
+        const colors = telemetry.dominant_colors || [];
+        colors.forEach(c => {
+          const swatch = document.createElement('div');
+          swatch.className = 'palette-swatch';
+          swatch.style.backgroundColor = 'rgb(' + c.rgb[0] + ',' + c.rgb[1] + ',' + c.rgb[2] + ')';
+          swatch.title = c.hex + ' (' + c.percentage + '%)';
+          paletteEl.appendChild(swatch);
+        });
+
+        const refStatusEl = document.getElementById('statColorRefStatus');
+        refStatusEl.textContent = telemetry.reference_status || 'Untaught';
+        refStatusEl.className = 'value ' + (telemetry.reference_status === 'Taught' ? 'ok' : 'warn');
+
+        document.getElementById('statDeltaE').textContent = telemetry.delta_e != null ? telemetry.delta_e.toFixed(2) : '—';
+
+        const matchEl = document.getElementById('statColorMatch');
+        if (telemetry.match === true) { matchEl.textContent = 'MATCH'; matchEl.className = 'value ok'; }
+        else if (telemetry.match === false) { matchEl.textContent = 'NO MATCH'; matchEl.className = 'value warn'; }
+        else { matchEl.textContent = '—'; matchEl.className = 'value'; }
       }
     } catch (e) { /* status endpoint not ready yet */ }
   }, 1500);
@@ -1128,6 +1219,39 @@ wireToggle('showDimsToggle', 'show_dimensions');
     });
     wireToggle('ocrShowTextToggle', 'show_text');
     wireToggle('ocrShowConfToggle', 'show_confidence');
+
+    const numColorsSlider = document.getElementById('numColorsSlider');
+    const numColorsVal = document.getElementById('numColorsVal');
+    numColorsSlider.addEventListener('input', () => { numColorsVal.textContent = numColorsSlider.value; });
+    numColorsSlider.addEventListener('change', async () => {
+      await apiPost('/settings', { num_colors: parseInt(numColorsSlider.value) });
+      log('Number of colors set to ' + numColorsSlider.value);
+    });
+
+    const deltaEThresholdSlider = document.getElementById('deltaEThresholdSlider');
+    const deltaEThresholdVal = document.getElementById('deltaEThresholdVal');
+    deltaEThresholdSlider.addEventListener('input', () => { deltaEThresholdVal.textContent = parseFloat(deltaEThresholdSlider.value).toFixed(1); });
+    deltaEThresholdSlider.addEventListener('change', async () => {
+      await apiPost('/settings', { delta_e_threshold: parseFloat(deltaEThresholdSlider.value) });
+      log('Delta-E threshold set to ' + deltaEThresholdSlider.value);
+    });
+
+    wireToggle('showColorsToggle', 'show_dominant_colors');
+    wireToggle('showColorMatchToggle', 'show_reference_match');
+
+    document.getElementById('setColorReferenceBtn').addEventListener('click', () => startTeach('reference'));
+    document.getElementById('resetColorReferenceBtn').addEventListener('click', async () => {
+      const result = await apiPost('/reset-reference');
+      if (result.success) {
+        const swatch = document.getElementById('colorRefSwatch');
+        swatch.style.backgroundImage = '';
+        swatch.classList.remove('filled');
+        document.getElementById('colorRefEmptyLabel').classList.remove('hidden');
+        log('Color reference reset', 'ok');
+      } else {
+        log('Reset failed: ' + (result.error || 'unknown error'), 'warn');
+      }
+    });
 
 // ---------- Measurement calibration workflow ----------
 const calibrationCanvas = document.getElementById('calibrationCanvas');
@@ -1339,15 +1463,17 @@ async function removeReference(cls, index) {
 }
 
 function startTeach(target) {
-  if (activeModuleId !== 'core-ai-identify') return;
+  if (activeModuleId !== 'core-ai-identify' && activeModuleId !== 'core-color-analysis') return;
   if (!isStreamRunning) {
     log('Start the stream before teaching', 'warn');
     return;
   }
-  const currentCount = target === 'good' ? goodThumbnails.length : badThumbnails.length;
-  if (currentCount >= MAX_REFS) {
-    log(target + ' gallery is full (max ' + MAX_REFS + ') — remove one first', 'warn');
-    return;
+  if (activeModuleId === 'core-ai-identify') {
+    const currentCount = target === 'good' ? goodThumbnails.length : badThumbnails.length;
+    if (currentCount >= MAX_REFS) {
+      log(target + ' gallery is full (max ' + MAX_REFS + ') — remove one first', 'warn');
+      return;
+    }
   }
   cancelCalibration();
 
@@ -1363,12 +1489,14 @@ function startTeach(target) {
   streamImg.style.display = 'none';
   teachCanvas.classList.remove('hidden');
   teachPanel.classList.remove('hidden');
-  teachPanel.className = 'overlay-panel teach-' + target;
-  teachHint.textContent = 'Drag a tight box around the ' + target.toUpperCase() + ' feature (' + (currentCount + 1) + '/' + MAX_REFS + ')';
+  teachPanel.className = 'overlay-panel teach-' + (target === 'reference' ? 'good' : target);
+  teachHint.textContent = target === 'reference'
+    ? 'Drag a tight box around the reference color swatch'
+    : 'Drag a tight box around the ' + target.toUpperCase() + ' feature';
   teachRetryBtn.classList.add('hidden');
   teachConfirmBtn.classList.add('hidden');
   scanline.classList.add('paused');
-  log('Teach ' + target + ' #' + currentCount + ': frame frozen. Drag a box around the feature.');
+  log('Teach ' + target + ': frame frozen. Drag a box.');
 }
 
 function redrawTeachOverlay() {
@@ -1432,6 +1560,30 @@ teachRetryBtn.addEventListener('click', () => {
 
 teachConfirmBtn.addEventListener('click', async () => {
   if (!teachRect || !teachTarget) return;
+
+  if (teachTarget === 'reference') {
+    const result = await apiPost('/teach-reference', {
+      x: teachRect.x, y: teachRect.y, w: teachRect.w, h: teachRect.h,
+    });
+    if (result.success) {
+      const thumbCanvas = document.createElement('canvas');
+      thumbCanvas.width = teachRect.w;
+      thumbCanvas.height = teachRect.h;
+      thumbCanvas.getContext('2d').drawImage(
+        teachFrozenImg, teachRect.x, teachRect.y, teachRect.w, teachRect.h,
+        0, 0, teachRect.w, teachRect.h
+      );
+      const swatch = document.getElementById('colorRefSwatch');
+      swatch.style.backgroundImage = 'url(' + thumbCanvas.toDataURL('image/png') + ')';
+      swatch.classList.add('filled');
+      document.getElementById('colorRefEmptyLabel').classList.add('hidden');
+      log('Reference color taught', 'ok');
+      endTeach();
+    } else {
+      log('Teach reference failed: ' + (result.error || 'unknown error'), 'warn');
+    }
+    return;
+  }
 
   const path = teachTarget === 'good' ? '/teach-good' : '/teach-bad';
   const result = await apiPost(path, {
