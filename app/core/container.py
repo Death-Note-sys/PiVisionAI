@@ -17,6 +17,7 @@ from .renderer_manager import RendererManager
 from .output_manager import OutputManager
 from .state import StateStore
 from .hardware import HardwareManager
+from .coordinator import InspectionCoordinator
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +63,7 @@ class Container:
         
         self.renderer_manager = RendererManager()
         self.output_manager = OutputManager()
+        self.coordinator = InspectionCoordinator(self.event_bus, self.state_store, self.output_manager)
         self.pipeline = Pipeline(self.event_bus, self.renderer_manager, self.output_manager)
         
         self.camera_manager = CameraManager(self.config, self.event_bus, self.pipeline, self.performance_monitor)

@@ -20,6 +20,39 @@ class OutputManager(IOutputManager):
         self.latest_jpeg = b""
         self.frame_id = 0
         
+        import collections
+        self.ng_queue = collections.deque(maxlen=50)
+        self.ng_thread = threading.Thread(target=self._ng_worker, daemon=True)
+        self.ng_thread.start()
+        
+    def save_ng(self, frame: np.ndarray, metadata: Dict[str, Any]) -> None:
+        copied_frame = frame.copy()
+        if len(self.ng_queue) == self.ng_queue.maxlen:
+            logger.warning("NG queue is full, dropping oldest frame.")
+        self.ng_queue.append((copied_frame, metadata))
+        
+    def _ng_worker(self):
+        import os
+        from datetime import datetime
+        while True:
+            if self.ng_queue:
+                frame, meta = self.ng_queue.popleft()
+                try:
+                    from app.core.container import Container
+                    container = Container.get_instance()
+                    if container and getattr(container, 'session_manager', None):
+                        out_dir = container.session_manager.get_data_dir("ng_images")
+                        ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+                        mod = meta.get("module_id", "unknown")
+                        fname = f"{mod}_{ts}.jpg"
+                        path = os.path.join(out_dir, fname)
+                        cv2.imwrite(path, frame)
+                        logger.info(f"Saved NG image to {path}")
+                except Exception as e:
+                    logger.error(f"Error saving NG image: {e}")
+            else:
+                time.sleep(0.1)
+        
     def add_client(self, client_id: str, client_type: str = "mjpeg") -> None:
         self.clients[client_id] = client_type
         logger.info(f"OutputManager: Added client {client_id} ({client_type})")
