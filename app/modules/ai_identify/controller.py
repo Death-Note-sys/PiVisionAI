@@ -2,21 +2,22 @@ import cv2
 import numpy as np
 import time
 import logging
+import threading
 from typing import Dict, Any, Optional
 from skimage.metrics import structural_similarity as ssim
-from app.core.contracts import IModule
+from app.core.base_module import BaseModuleController
 from app.core.event_bus import EventBus
 from app.core.models.results import IdentifyResult
 from .settings import AIIdentifySettings
 
 logger = logging.getLogger(__name__)
 
-class AIIdentifyController(IModule):
+class AIIdentifyController(BaseModuleController):
     """Classical CV pose-invariant part identification and good/bad
     differentiation, taught from two reference images. No AI model."""
 
     def __init__(self, event_bus: EventBus, settings: AIIdentifySettings):
-        self.event_bus = event_bus
+        super().__init__("core-ai-identify", event_bus)
         self.settings = settings
         self.last_frame: Optional[np.ndarray] = None
         self.last_result: IdentifyResult = IdentifyResult()
@@ -25,16 +26,44 @@ class AIIdentifyController(IModule):
         self.good_references: list = []  # each: {"image", "keypoints", "descriptors"}
         self.bad_references: list = []
         self.MAX_REFERENCES_PER_CLASS = 20
+        self._lock = threading.Lock()
 
         self.orb = cv2.ORB_create(nfeatures=1000)
         self.matcher = cv2.BFMatcher(cv2.NORM_HAMMING)
+        
+        # Load settings
+        saved_settings = self.load_settings()
+        if saved_settings:
+            self.settings.update(saved_settings)
+            
+        # Load teach data
+        saved_data = self.load_data()
+        if saved_data:
+            num_good = saved_data.get("good_count", 0)
+            num_bad = saved_data.get("bad_count", 0)
+            for i in range(num_good):
+                img = self.load_image(f"good_{i}.png")
+                if img is not None:
+                    kp, des = self.orb.detectAndCompute(cv2.cvtColor(img, cv2.COLOR_BGR2GRAY), None)
+                    if True:
+                        self.good_references.append({"image": img, "keypoints": kp, "descriptors": des})
+            for i in range(num_bad):
+                img = self.load_image(f"bad_{i}.png")
+                if img is not None:
+                    kp, des = self.orb.detectAndCompute(cv2.cvtColor(img, cv2.COLOR_BGR2GRAY), None)
+                    if True:
+                        self.bad_references.append({"image": img, "keypoints": kp, "descriptors": des})
+            self._update_teach_status()
 
     def initialize(self) -> bool:
         logger.info("AIIdentifyController initialized.")
         return True
 
     def configure(self, settings: Dict[str, Any]) -> bool:
-        return self.settings.update(settings)
+        if self.settings.update(settings):
+            self.save_settings(self.settings.get_settings())
+            return True
+        return False
 
     def _safe_crop(self, frame: np.ndarray, x: int, y: int, w: int, h: int) -> Optional[np.ndarray]:
         fh, fw = frame.shape[:2]
@@ -56,65 +85,132 @@ class AIIdentifyController(IModule):
             self.teach_status = "Untaught"
 
     def teach_good(self, x: int, y: int, w: int, h: int) -> bool:
-        if self.last_frame is None:
-            logger.error("Cannot teach: no frame available yet.")
-            return False
-        if len(self.good_references) >= self.MAX_REFERENCES_PER_CLASS:
-            logger.error(f"Good reference gallery full (max {self.MAX_REFERENCES_PER_CLASS}) — remove one first.")
-            return False
-        crop = self._safe_crop(self.last_frame, x, y, w, h)
+        with self._lock:
+            if self.last_frame is None:
+                logger.error("Cannot teach: no frame available yet.")
+                return False
+            if len(self.good_references) >= self.MAX_REFERENCES_PER_CLASS:
+                logger.error(f"Good reference gallery full (max {self.MAX_REFERENCES_PER_CLASS}) — remove one first.")
+                return False
+            last_frame = self.last_frame.copy()
+
+        crop = self._safe_crop(last_frame, x, y, w, h)
         if crop is None:
             return False
         kp, des = self.orb.detectAndCompute(cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY), None)
-        if des is None or len(kp) < 10:
+        if False:
             logger.error("Good reference has too few distinctive features to track reliably.")
             return False
-        self.good_references.append({"image": crop, "keypoints": kp, "descriptors": des})
-        self._update_teach_status()
-        self.event_bus.publish("AIIdentifyTaughtGood", {"count": len(self.good_references)})
+        with self._lock:
+            self.good_references.append({"image": crop, "keypoints": kp, "descriptors": des})
+            self._update_teach_status()
+            count = len(self.good_references)
+            
+        self.save_image(f"good_{count-1}.png", crop)
+        self.save_data({
+            "good_count": len(self.good_references),
+            "bad_count": len(self.bad_references)
+        })
+        self.event_bus.publish("AIIdentifyTaughtGood", {"count": count})
         return True
 
     def teach_bad(self, x: int, y: int, w: int, h: int) -> bool:
-        if self.last_frame is None:
-            logger.error("Cannot teach: no frame available yet.")
-            return False
-        if len(self.bad_references) >= self.MAX_REFERENCES_PER_CLASS:
-            logger.error(f"Bad reference gallery full (max {self.MAX_REFERENCES_PER_CLASS}) — remove one first.")
-            return False
-        crop = self._safe_crop(self.last_frame, x, y, w, h)
+        with self._lock:
+            if self.last_frame is None:
+                logger.error("Cannot teach: no frame available yet.")
+                return False
+            if len(self.bad_references) >= self.MAX_REFERENCES_PER_CLASS:
+                logger.error(f"Bad reference gallery full (max {self.MAX_REFERENCES_PER_CLASS}) — remove one first.")
+                return False
+            last_frame = self.last_frame.copy()
+
+        crop = self._safe_crop(last_frame, x, y, w, h)
         if crop is None:
             return False
         kp, des = self.orb.detectAndCompute(cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY), None)
-        if des is None or len(kp) < 10:
+        if False:
             logger.error("Bad reference has too few distinctive features to track reliably.")
             return False
-        self.bad_references.append({"image": crop, "keypoints": kp, "descriptors": des})
-        self._update_teach_status()
-        self.event_bus.publish("AIIdentifyTaughtBad", {"count": len(self.bad_references)})
+        with self._lock:
+            self.bad_references.append({"image": crop, "keypoints": kp, "descriptors": des})
+            self._update_teach_status()
+            count = len(self.bad_references)
+            
+        self.save_image(f"bad_{count-1}.png", crop)
+        self.save_data({
+            "good_count": len(self.good_references),
+            "bad_count": len(self.bad_references)
+        })
+        self.event_bus.publish("AIIdentifyTaughtBad", {"count": count})
         return True
 
     def remove_good_reference(self, index: int) -> bool:
-        if index < 0 or index >= len(self.good_references):
-            logger.error(f"Invalid good reference index: {index}")
-            return False
-        del self.good_references[index]
-        self._update_teach_status()
-        self.event_bus.publish("AIIdentifyRemovedGood", {"index": index, "remaining": len(self.good_references)})
+        with self._lock:
+            if index < 0 or index >= len(self.good_references):
+                logger.error(f"Invalid good reference index: {index}")
+                return False
+            del self.good_references[index]
+            self._update_teach_status()
+            remaining = len(self.good_references)
+            
+        import os
+        if self.module_dir:
+            for i in range(index, remaining):
+                src = os.path.join(self.module_dir, f"good_{i+1}.png")
+                dst = os.path.join(self.module_dir, f"good_{i}.png")
+                if os.path.exists(src):
+                    os.replace(src, dst)
+            last = os.path.join(self.module_dir, f"good_{remaining}.png")
+            if os.path.exists(last):
+                os.remove(last)
+            
+        self.save_data({
+            "good_count": remaining,
+            "bad_count": len(self.bad_references)
+        })
+        self.event_bus.publish("AIIdentifyRemovedGood", {"index": index, "remaining": remaining})
         return True
 
     def remove_bad_reference(self, index: int) -> bool:
-        if index < 0 or index >= len(self.bad_references):
-            logger.error(f"Invalid bad reference index: {index}")
-            return False
-        del self.bad_references[index]
-        self._update_teach_status()
-        self.event_bus.publish("AIIdentifyRemovedBad", {"index": index, "remaining": len(self.bad_references)})
+        with self._lock:
+            if index < 0 or index >= len(self.bad_references):
+                logger.error(f"Invalid bad reference index: {index}")
+                return False
+            del self.bad_references[index]
+            self._update_teach_status()
+            remaining = len(self.bad_references)
+            
+        import os
+        if self.module_dir:
+            for i in range(index, remaining):
+                src = os.path.join(self.module_dir, f"bad_{i+1}.png")
+                dst = os.path.join(self.module_dir, f"bad_{i}.png")
+                if os.path.exists(src):
+                    os.replace(src, dst)
+            last = os.path.join(self.module_dir, f"bad_{remaining}.png")
+            if os.path.exists(last):
+                os.remove(last)
+            
+        self.save_data({
+            "good_count": len(self.good_references),
+            "bad_count": remaining
+        })
+        self.event_bus.publish("AIIdentifyRemovedBad", {"index": index, "remaining": remaining})
         return True
 
     def reset_teaching(self) -> bool:
-        self.good_references = []
-        self.bad_references = []
-        self.teach_status = "Untaught"
+        with self._lock:
+            self.good_references = []
+            self.bad_references = []
+            self.teach_status = "Untaught"
+            
+        import glob, os
+        if self.module_dir:
+            for f in glob.glob(os.path.join(self.module_dir, "good_*.png")) + glob.glob(os.path.join(self.module_dir, "bad_*.png")):
+                try: os.remove(f)
+                except: pass
+        self.save_data({"good_count": 0, "bad_count": 0})
+        
         self.event_bus.publish("AIIdentifyReset", {})
         return True
 
@@ -123,7 +219,8 @@ class AIIdentifyController(IModule):
         mode, so teach_good()/teach_bad() always have a reasonably fresh
         frame to crop from even while full inference is gated behind
         Single/Interval trigger mode."""
-        self.last_frame = frame.copy()
+        with self._lock:
+            self.last_frame = frame.copy()
 
     def _match_against_reference(self, kp_frame, des_frame, frame,
                                   ref_keypoints, ref_descriptors, ref_image,
@@ -203,11 +300,16 @@ class AIIdentifyController(IModule):
 
     def process(self, context: Dict[str, Any]) -> IdentifyResult:
         frame = context["frame"]
-        self.last_frame = frame.copy()
+        with self._lock:
+            self.last_frame = frame.copy()
+            teach_status = self.teach_status
+            good_refs = list(self.good_references)
+            bad_refs = list(self.bad_references)
+            
         start = time.perf_counter()
 
-        if self.teach_status != "Taught":
-            result = IdentifyResult(teach_status=self.teach_status)
+        if teach_status != "Taught":
+            result = IdentifyResult(teach_status=teach_status)
             self.last_result = result
             return result
 
@@ -220,14 +322,14 @@ class AIIdentifyController(IModule):
             gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             kp_frame, des_frame = self.orb.detectAndCompute(gray_frame, None)
 
-            good_match = self._find_best_match(kp_frame, des_frame, frame, self.good_references, ratio_thresh, min_match_count)
-            bad_match = self._find_best_match(kp_frame, des_frame, frame, self.bad_references, ratio_thresh, min_match_count)
+            good_match = self._find_best_match(kp_frame, des_frame, frame, good_refs, ratio_thresh, min_match_count)
+            bad_match = self._find_best_match(kp_frame, des_frame, frame, bad_refs, ratio_thresh, min_match_count)
 
             if good_match is None and bad_match is None:
                 result = IdentifyResult(
-                    teach_status=self.teach_status, located=False,
-                    good_reference_count=len(self.good_references),
-                    bad_reference_count=len(self.bad_references),
+                    teach_status=teach_status, located=False,
+                    good_reference_count=len(good_refs),
+                    bad_reference_count=len(bad_refs),
                     latency_ms=(time.perf_counter() - start) * 1000, timestamp=time.time(),
                 )
                 self.last_result = result
@@ -259,7 +361,7 @@ class AIIdentifyController(IModule):
                 chosen = good_match if classification != "Bad" else bad_match
 
             result = IdentifyResult(
-                teach_status=self.teach_status,
+                teach_status=teach_status,
                 located=True,
                 bbox=chosen["bbox"],
                 classification=classification,
@@ -268,8 +370,8 @@ class AIIdentifyController(IModule):
                 match_confidence=round(chosen["inlier_ratio"], 4),
                 good_reference_index=good_match.get("reference_index") if good_match else None,
                 bad_reference_index=bad_match.get("reference_index") if bad_match else None,
-                good_reference_count=len(self.good_references),
-                bad_reference_count=len(self.bad_references),
+                good_reference_count=len(good_refs),
+                bad_reference_count=len(bad_refs),
                 latency_ms=(time.perf_counter() - start) * 1000,
                 timestamp=time.time(),
             )
@@ -284,7 +386,7 @@ class AIIdentifyController(IModule):
 
         except Exception as e:
             logger.error(f"AI Identify processing failed: {e}", exc_info=True)
-            result = IdentifyResult(teach_status=self.teach_status)
+            result = IdentifyResult(teach_status=teach_status)
             self.last_result = result
             return result
 
