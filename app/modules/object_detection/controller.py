@@ -1,7 +1,7 @@
 import logging
 import time
 from typing import Dict, Any
-from app.core.contracts import IModule
+from app.core.base_module import BaseModuleController
 from app.core.event_bus import EventBus
 from app.core.ai_runtime import AIRuntimeManager
 from app.core.models.results import DetectionResult
@@ -9,14 +9,20 @@ from .settings import ObjectDetectionSettings
 
 logger = logging.getLogger(__name__)
 
-class ObjectDetectionController(IModule):
+class ObjectDetectionController(BaseModuleController):
     """Business logic for Object Detection. Purely logic, no rendering."""
     
     def __init__(self, event_bus: EventBus, ai_runtime: AIRuntimeManager, settings: ObjectDetectionSettings):
-        self.event_bus = event_bus
+        super().__init__("core-object-detection", event_bus)
         self.ai_runtime = ai_runtime
         self.settings = settings
-        self.active_model_id = "yolo11n" # Default, normally retrieved via Settings
+        
+        # Load settings
+        saved_settings = self.load_settings()
+        if saved_settings:
+            self.settings.update(saved_settings)
+            
+        self.active_model_id = self.settings.get_settings().get("model_id", "yolo11n")
         self.last_result = DetectionResult()
         
     def initialize(self) -> bool:
@@ -24,16 +30,19 @@ class ObjectDetectionController(IModule):
         return True
         
     def configure(self, settings: Dict[str, Any]) -> bool:
-        self.settings.update(settings)
-        if "model_id" in settings:
-            self.active_model_id = settings["model_id"]
-        return True
+        if self.settings.update(settings):
+            if "model_id" in settings:
+                self.active_model_id = settings["model_id"]
+            self.save_settings(self.settings.get_settings())
+            return True
+        return False
         
     def process(self, context: Dict[str, Any]) -> DetectionResult:
         frame = context["frame"]
         
         # Get settings
         conf = self.settings.get_settings().get("confidence", 0.5)
+        count_min = self.settings.get_settings().get("count_min", 0)
         
         # Request inference from AI Runtime Adapter
         try:

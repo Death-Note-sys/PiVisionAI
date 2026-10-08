@@ -3,21 +3,30 @@ import math
 import time
 import logging
 from typing import Dict, Any, Optional
-from app.core.contracts import IModule
+from app.core.base_module import BaseModuleController
 from app.core.event_bus import EventBus
 from app.core.models.results import MeasurementResult
 from .settings import MeasurementSettings
 
 logger = logging.getLogger(__name__)
 
-class MeasurementController(IModule):
+class MeasurementController(BaseModuleController):
     """Classical CV dimension inspection. No AI runtime involved."""
 
     def __init__(self, event_bus: EventBus, settings: MeasurementSettings):
-        self.event_bus = event_bus
+        super().__init__("core-measurement", event_bus)
         self.settings = settings
-        self.pixels_per_cm: Optional[float] = None
-        self.calibration_status: str = "Uncalibrated"
+        
+        # Load settings
+        saved_settings = self.load_settings()
+        if saved_settings:
+            self.settings.update(saved_settings)
+            
+        # Load calibration data
+        saved_data = self.load_data()
+        self.pixels_per_mm = saved_data.get("pixels_per_mm")
+        self.calibration_status = "Calibrated" if self.pixels_per_mm else "Uncalibrated"
+        
         self.last_result: MeasurementResult = MeasurementResult()
 
     def initialize(self) -> bool:
@@ -25,18 +34,24 @@ class MeasurementController(IModule):
         return True
 
     def configure(self, settings: Dict[str, Any]) -> bool:
-        return self.settings.update(settings)
+        if self.settings.update(settings):
+            self.save_settings(self.settings.get_settings())
+            return True
+        return False
 
-    def calibrate(self, x1: int, y1: int, x2: int, y2: int, real_length_cm: float) -> bool:
-        """Set pixels-per-cm from two clicked points and a known real-world distance."""
+    def calibrate(self, x1: int, y1: int, x2: int, y2: int, real_length_mm: float) -> bool:
+        """Set pixels-per-mm from two clicked points and a known real-world distance."""
         pixel_distance = math.hypot(x2 - x1, y2 - y1)
-        if pixel_distance <= 0 or real_length_cm <= 0:
+        if pixel_distance <= 0 or real_length_mm <= 0:
             logger.error("Calibration failed: zero-length reference line or invalid real length.")
             return False
-        self.pixels_per_cm = pixel_distance / real_length_cm
+        self.pixels_per_mm = pixel_distance / real_length_mm
         self.calibration_status = "Calibrated"
-        self.event_bus.publish("MeasurementCalibrated", {"pixels_per_cm": self.pixels_per_cm})
-        logger.info(f"Measurement calibrated: {self.pixels_per_cm:.3f} px/cm")
+        
+        self.save_data({"pixels_per_mm": self.pixels_per_mm})
+        
+        self.event_bus.publish("MeasurementCalibrated", {"pixels_per_mm": self.pixels_per_mm})
+        logger.info(f"Measurement calibrated: {self.pixels_per_mm:.3f} px/mm")
         return True
 
     def process(self, context: Dict[str, Any]) -> MeasurementResult:
@@ -52,7 +67,7 @@ class MeasurementController(IModule):
             contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         except Exception as e:
             logger.error(f"Contour detection failed: {e}")
-            return MeasurementResult(calibration_status=self.calibration_status, pixels_per_cm=self.pixels_per_cm)
+            return MeasurementResult(calibration_status=self.calibration_status, pixels_per_mm=self.pixels_per_mm)
 
         measurements = []
         for c in contours:
@@ -60,7 +75,9 @@ class MeasurementController(IModule):
             if area_px < settings["min_contour_area"]:
                 continue
 
-            x, y, w, h = cv2.boundingRect(c)
+            rect = cv2.minAreaRect(c)
+            x, y, _, _ = cv2.boundingRect(c)
+            w, h = rect[1]
             perimeter_px = cv2.arcLength(c, True)
 
             entry = {
@@ -69,17 +86,17 @@ class MeasurementController(IModule):
                 "height_px": float(h),
                 "perimeter_px": float(perimeter_px),
                 "area_px": float(area_px),
-                "width_cm": None,
-                "height_cm": None,
-                "perimeter_cm": None,
-                "area_cm2": None,
+                "width_mm": None,
+                "height_mm": None,
+                "perimeter_mm": None,
+                "area_mm2": None,
             }
 
-            if self.pixels_per_cm:
-                entry["width_cm"] = round(w / self.pixels_per_cm, 2)
-                entry["height_cm"] = round(h / self.pixels_per_cm, 2)
-                entry["perimeter_cm"] = round(perimeter_px / self.pixels_per_cm, 2)
-                entry["area_cm2"] = round(area_px / (self.pixels_per_cm ** 2), 2)
+            if self.pixels_per_mm:
+                entry["width_mm"] = round(w / self.pixels_per_mm, 2)
+                entry["height_mm"] = round(h / self.pixels_per_mm, 2)
+                entry["perimeter_mm"] = round(perimeter_px / self.pixels_per_mm, 2)
+                entry["area_mm2"] = round(area_px / (self.pixels_per_mm ** 2), 2)
 
             measurements.append(entry)
 
@@ -88,7 +105,7 @@ class MeasurementController(IModule):
         result = MeasurementResult(
             measurements=measurements,
             calibration_status=self.calibration_status,
-            pixels_per_cm=self.pixels_per_cm,
+            pixels_per_mm=self.pixels_per_mm,
             latency_ms=latency_ms,
             timestamp=time.time(),
         )

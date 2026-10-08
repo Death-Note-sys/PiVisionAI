@@ -1,7 +1,8 @@
 import logging
 import time
+import re
 from typing import Dict, Any
-from app.core.contracts import IModule
+from app.core.base_module import BaseModuleController
 from app.core.event_bus import EventBus
 from app.core.ai_runtime import AIRuntimeManager
 from app.core.models.results import OCRResult
@@ -9,12 +10,18 @@ from .settings import OCRSettings
 
 logger = logging.getLogger(__name__)
 
-class OCRController(IModule):
+class OCRController(BaseModuleController):
     def __init__(self, event_bus: EventBus, ai_runtime: AIRuntimeManager, settings: OCRSettings):
-        self.event_bus = event_bus
+        super().__init__("core-ocr", event_bus)
         self.ai_runtime = ai_runtime
         self.settings = settings
-        self.active_model_id = "easyocr"
+        
+        # Load settings
+        saved_settings = self.load_settings()
+        if saved_settings:
+            self.settings.update(saved_settings)
+            
+        self.active_model_id = self.settings.get_settings().get("model_id", "easyocr")
         self.last_result: OCRResult = OCRResult()
 
     def initialize(self) -> bool:
@@ -22,16 +29,21 @@ class OCRController(IModule):
         return True
 
     def configure(self, settings: Dict[str, Any]) -> bool:
-        self.settings.update(settings)
-        if "model_id" in settings:
-            self.active_model_id = settings["model_id"]
-        return True
+        if self.settings.update(settings):
+            if "model_id" in settings:
+                self.active_model_id = settings["model_id"]
+            self.save_settings(self.settings.get_settings())
+            return True
+        return False
 
     def process(self, context: Dict[str, Any]) -> OCRResult:
         frame = context["frame"]
         settings = self.settings.get_settings()
         min_confidence = settings.get("min_confidence", 0.3)
         canvas_size = settings.get("canvas_size", 960)
+        expected_pattern = settings.get("expected_pattern", "")
+        # Use re.fullmatch if expected_pattern is set
+        if expected_pattern: re.fullmatch(expected_pattern, "test")
 
         try:
             adapter_result = self.ai_runtime.predict(
