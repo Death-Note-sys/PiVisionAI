@@ -535,6 +535,38 @@
     font-family: var(--font-data);
   }
 
+  .color-palette {
+    display: flex;
+    gap: 4px;
+    margin: 8px 0;
+  }
+  .palette-swatch {
+    width: 32px;
+    height: 32px;
+    border-radius: 4px;
+    border: 1px solid var(--hairline);
+    flex-shrink: 0;
+  }
+  .color-ref-swatch {
+    width: 100%;
+    height: 60px;
+    border-radius: 4px;
+    border: 1px dashed var(--hairline);
+    background-color: var(--panel-raised);
+    background-size: cover;
+    background-position: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 8px 0;
+  }
+  .color-ref-swatch.filled { border-style: solid; border-color: var(--cyan); }
+  .color-ref-swatch .empty-label {
+    font-size: 11px;
+    color: var(--text-faint);
+    font-family: var(--font-data);
+  }
+
   .console {
     height: 140px;
     flex-shrink: 0;
@@ -588,6 +620,7 @@
       <option value="core-measurement">Measurement</option>
       <option value="core-ai-identify">AI Identify</option>
       <option value="core-ocr">OCR</option>
+      <option value="core-color-analysis">Color Analysis</option>
     </select>
     <div class="toolbar-divider"></div>
     <select class="module-select" id="cameraIndexSelect" title="Camera source">
@@ -607,6 +640,13 @@
     </select>
     <input type="number" id="triggerIntervalInput" class="toolbar-number hidden" min="0.5" step="0.5" value="5" title="Interval (seconds)">
     <button class="vp-btn hidden" id="fireTriggerBtn"><i class="ti ti-bolt"></i>Fire</button>
+    <div class="toolbar-divider"></div>
+    <div class="global-counts" style="display:flex; gap:16px; align-items:center; font-family: var(--font-data); font-size: 13px;">
+      <div id="globalLamp" style="width: 16px; height: 16px; border-radius: 50%; background: var(--hairline); transition: background 0.2s;"></div>
+      <div>OK: <span id="globalOkCount" style="color: var(--ok)">0</span></div>
+      <div>NG: <span id="globalNgCount" style="color: var(--ng)">0</span></div>
+      <div>Total: <span id="globalTotalCount">0</span></div>
+    </div>
     <div class="toolbar-spacer"></div>
     <div class="backend-badge"><span class="dot"></span><span id="backendLabel">CPU backend</span></div>
   </div>
@@ -617,7 +657,7 @@
       <div class="tool-btn active" data-module="core-object-detection" title="Object detection"><i class="ti ti-box-multiple"></i></div>
       <div class="tool-btn" data-module="core-measurement" title="Measurement"><i class="ti ti-ruler-2"></i></div>
       <div class="tool-btn" data-module="core-ai-identify" title="AI Identify"><i class="ti ti-focus-2"></i></div>
-      <div class="tool-btn disabled" title="Color analysis (coming soon)"><i class="ti ti-color-swatch"></i></div>
+      <div class="tool-btn" data-module="core-color-analysis" title="Color Analysis"><i class="ti ti-color-swatch"></i></div>
       <div class="tool-btn" data-module="core-ocr" title="OCR"><i class="ti ti-abc"></i></div>
       <div class="tool-btn disabled" title="Motion (coming soon)"><i class="ti ti-wave-sine"></i></div>
       <div class="tool-btn disabled" title="Shape (coming soon)"><i class="ti ti-shape"></i></div>
@@ -641,7 +681,7 @@
 
         <div class="overlay-panel hidden" id="calibrationPanel">
           <span id="calibrationHint">Click two points on a known reference length</span>
-          <input type="number" id="calibrationLengthInput" placeholder="cm" min="0.1" step="0.1" class="hidden">
+          <input type="number" id="calibrationLengthInput" placeholder="mm" min="1" step="1" class="hidden">
           <button class="vp-btn primary hidden" id="calibrationApplyBtn">Apply</button>
           <button class="vp-btn" id="calibrationCancelBtn">Cancel</button>
         </div>
@@ -675,7 +715,7 @@
         <div class="measurement-only hidden">
           <div class="stat-row"><span class="label">Measurements</span><span class="value accent" id="statMeasurements">0</span></div>
           <div class="stat-row"><span class="label">Calibration</span><span class="value warn" id="statCalibration">Uncalibrated</span></div>
-          <div class="stat-row"><span class="label">Px / cm</span><span class="value" id="statPxPerCm">—</span></div>
+          <div class="stat-row"><span class="label">Px / mm</span><span class="value" id="statPxPerMm">—</span></div>
         </div>
 
         <div class="ai-identify-only hidden">
@@ -726,7 +766,7 @@
         <div class="field">
           <div class="field-label"><span>Unit</span></div>
           <select class="inline-select" id="unitSelect">
-            <option value="cm">Centimeters</option>
+            <option value="mm">Millimeters</option>
             <option value="px">Pixels</option>
           </select>
         </div>
@@ -778,6 +818,64 @@
           <div class="switch on" id="ocrShowConfToggle"></div>
         </div>
       </div>
+
+      <div class="inspector-section color-analysis-only hidden">
+        <p class="inspector-title">Color readout</p>
+        <div class="color-palette" id="colorPalette"></div>
+        <div class="stat-row"><span class="label">Reference</span><span class="value warn" id="statColorRefStatus">Untaught</span></div>
+        <div class="stat-row"><span class="label">Delta-E</span><span class="value" id="statDeltaE">—</span></div>
+        <div class="stat-row"><span class="label">Match</span><span class="value" id="statColorMatch">—</span></div>
+      </div>
+
+      <div class="inspector-section color-analysis-only hidden">
+        <p class="inspector-title">Color settings</p>
+        <div class="field">
+          <div class="field-label"><span>Number of colors</span><span class="field-value" id="numColorsVal">5</span></div>
+          <input type="range" id="numColorsSlider" min="1" max="10" step="1" value="5">
+        </div>
+        <div class="field">
+          <div class="field-label"><span>Delta-E threshold</span><span class="field-value" id="deltaEThresholdVal">25.0</span></div>
+          <input type="range" id="deltaEThresholdSlider" min="1" max="60" step="0.5" value="25">
+        </div>
+        <div class="toggle-row">
+          <span>Show dominant colors</span>
+          <div class="switch on" id="showColorsToggle"></div>
+        </div>
+        <div class="toggle-row">
+          <span>Show reference match</span>
+          <div class="switch on" id="showColorMatchToggle"></div>
+        </div>
+        <div class="color-ref-swatch" id="colorRefSwatch">
+          <span class="empty-label" id="colorRefEmptyLabel">No reference taught</span>
+        </div>
+        <button class="full-btn" id="setColorReferenceBtn"><i class="ti ti-eyedropper"></i> Set Reference Color</button>
+        <button class="full-btn neutral" id="resetColorReferenceBtn" style="margin-top:6px;"><i class="ti ti-refresh"></i> Reset Reference</button>
+      </div>
+      </div>
+
+      <div class="inspector-section">
+        <p class="inspector-title">Camera settings</p>
+        <div class="toggle-row">
+          <span>Auto Exposure</span>
+          <div class="switch on" id="autoExposureToggle"></div>
+        </div>
+        <div class="field">
+          <div class="field-label"><span>Exposure</span><span class="field-value" id="exposureVal">-5</span></div>
+          <input type="range" id="exposureSlider" min="-13" max="0" step="1" value="-5" disabled>
+        </div>
+        <div class="field">
+          <div class="field-label"><span>Gain</span><span class="field-value" id="gainVal">0</span></div>
+          <input type="range" id="gainSlider" min="0" max="255" step="1" value="0">
+        </div>
+        <div class="toggle-row">
+          <span>Auto White Balance</span>
+          <div class="switch on" id="autoWbToggle"></div>
+        </div>
+        <div class="field">
+          <div class="field-label"><span>WB Temp</span><span class="field-value" id="wbVal">4600</span></div>
+          <input type="range" id="wbSlider" min="2000" max="10000" step="100" value="4600" disabled>
+        </div>
+      </div>
     </div>
 
   </div>
@@ -794,10 +892,11 @@
 // ---------- Module-aware API layer ----------
 let activeModuleId = 'core-object-detection';
 const API_BASES = {
-  'core-object-detection': '/api/v1/object-detection',
-  'core-measurement': '/api/v1/measurement',
-  'core-ai-identify': '/api/v1/ai-identify',
-  'core-ocr': '/api/v1/ocr',
+  'core-object-detection': '/api/v1/modules/active',
+  'core-measurement': '/api/v1/modules/active',
+  'core-ai-identify': '/api/v1/modules/active',
+  'core-ocr': '/api/v1/modules/active',
+  'core-color-analysis': '/api/v1/modules/active',
 };
 function apiBase() { return API_BASES[activeModuleId]; }
 
@@ -855,6 +954,7 @@ function setActiveModule(moduleId) {
   document.querySelectorAll('.measurement-only').forEach(el => el.classList.toggle('hidden', moduleId !== 'core-measurement'));
   document.querySelectorAll('.ai-identify-only').forEach(el => el.classList.toggle('hidden', moduleId !== 'core-ai-identify'));
   document.querySelectorAll('.ocr-only').forEach(el => el.classList.toggle('hidden', moduleId !== 'core-ocr'));
+  document.querySelectorAll('.color-analysis-only').forEach(el => el.classList.toggle('hidden', moduleId !== 'core-color-analysis'));
   calibrateBtn.classList.toggle('hidden', moduleId !== 'core-measurement');
 
   if (moduleId === 'core-ai-identify') resetTeachUIState();
@@ -864,8 +964,57 @@ function setActiveModule(moduleId) {
   }
 
   document.getElementById('statStatus').textContent = 'Idle';
-  const names = { 'core-object-detection': 'Object Detection', 'core-measurement': 'Measurement', 'core-ai-identify': 'AI Identify' };
-  log('Switched to ' + names[moduleId]);
+  const names = { 'core-object-detection': 'Object Detection', 'core-measurement': 'Measurement', 'core-ai-identify': 'AI Identify', 'core-ocr': 'OCR', 'core-color-analysis': 'Color Analysis' };
+  log('Switched to ' + (names[moduleId] || moduleId));
+  
+  // Initialize controls and gallery from server state
+  apiGet('/status').then(status => {
+    if (status && !status.error) {
+      const settings = status.settings || {};
+      
+      if (moduleId === 'core-color-analysis') {
+        if (settings.delta_e_threshold !== undefined) {
+          document.getElementById('deltaEThresholdSlider').value = settings.delta_e_threshold;
+          document.getElementById('deltaEThresholdVal').textContent = settings.delta_e_threshold;
+        }
+        if (status.telemetry && status.telemetry.reference_status === 'Taught') {
+          const swatch = document.getElementById('referenceSwatch');
+          swatch.style.backgroundImage = `url('/api/v1/modules/active/gallery/color/0?t=${Date.now()}')`;
+          swatch.style.backgroundSize = 'cover';
+        } else {
+          document.getElementById('referenceSwatch').style.backgroundImage = 'none';
+        }
+      } else if (moduleId === 'core-ai-identify') {
+        if (settings.match_threshold !== undefined) {
+          const matchEl = document.getElementById('matchThresholdSlider');
+          if (matchEl) matchEl.value = settings.match_threshold;
+          const matchValEl = document.getElementById('matchThresholdVal');
+          if (matchValEl) matchValEl.textContent = settings.match_threshold;
+        }
+        
+        // Rebuild galleries
+        const telemetry = status.telemetry || {};
+        const gc = telemetry.good_reference_count || 0;
+        const bc = telemetry.bad_reference_count || 0;
+        
+        goodThumbnails.length = 0;
+        for (let i = 0; i < gc; i++) {
+          goodThumbnails.push(`/api/v1/modules/active/gallery/good/${i}`);
+        }
+        renderGallery(document.getElementById('goodGallery'), goodThumbnails, 'good');
+        
+        badThumbnails.length = 0;
+        for (let i = 0; i < bc; i++) {
+          badThumbnails.push(`/api/v1/modules/active/gallery/bad/${i}`);
+        }
+        renderGallery(document.getElementById('badGallery'), badThumbnails, 'bad');
+      } else if (moduleId === 'core-measurement') {
+         if (settings.pixels_per_mm !== undefined && settings.pixels_per_mm !== null) {
+            document.getElementById('statPxPerMm').textContent = settings.pixels_per_mm.toFixed(2);
+         }
+      }
+    }
+  }).catch(e => console.error("Failed to fetch initial status", e));
 }
 
 document.querySelectorAll('.tool-btn[data-module]').forEach(btn => {
@@ -1004,7 +1153,7 @@ function beginPolling() {
           calEl.classList.toggle('ok', telemetry.calibration_status === 'Calibrated');
           calEl.classList.toggle('warn', telemetry.calibration_status !== 'Calibrated');
         }
-        document.getElementById('statPxPerCm').textContent = telemetry.pixels_per_cm ? telemetry.pixels_per_cm.toFixed(2) : '—';
+        document.getElementById('statPxPerMm').textContent = telemetry.pixels_per_mm ? telemetry.pixels_per_mm.toFixed(2) : '—';
 
       } else if (activeModuleId === 'core-ai-identify') {
         document.getElementById('statLocated').textContent = telemetry.located ? 'Yes' : 'No';
@@ -1046,6 +1195,29 @@ function beginPolling() {
             listEl.appendChild(row);
           });
         }
+
+      } else if (activeModuleId === 'core-color-analysis') {
+        const paletteEl = document.getElementById('colorPalette');
+        paletteEl.innerHTML = '';
+        const colors = telemetry.dominant_colors || [];
+        colors.forEach(c => {
+          const swatch = document.createElement('div');
+          swatch.className = 'palette-swatch';
+          swatch.style.backgroundColor = 'rgb(' + c.rgb[0] + ',' + c.rgb[1] + ',' + c.rgb[2] + ')';
+          swatch.title = c.hex + ' (' + c.percentage + '%)';
+          paletteEl.appendChild(swatch);
+        });
+
+        const refStatusEl = document.getElementById('statColorRefStatus');
+        refStatusEl.textContent = telemetry.reference_status || 'Untaught';
+        refStatusEl.className = 'value ' + (telemetry.reference_status === 'Taught' ? 'ok' : 'warn');
+
+        document.getElementById('statDeltaE').textContent = telemetry.delta_e != null ? telemetry.delta_e.toFixed(2) : '—';
+
+        const matchEl = document.getElementById('statColorMatch');
+        if (telemetry.match === true) { matchEl.textContent = 'MATCH'; matchEl.className = 'value ok'; }
+        else if (telemetry.match === false) { matchEl.textContent = 'NO MATCH'; matchEl.className = 'value warn'; }
+        else { matchEl.textContent = '—'; matchEl.className = 'value'; }
       }
     } catch (e) { /* status endpoint not ready yet */ }
   }, 1500);
@@ -1128,6 +1300,39 @@ wireToggle('showDimsToggle', 'show_dimensions');
     });
     wireToggle('ocrShowTextToggle', 'show_text');
     wireToggle('ocrShowConfToggle', 'show_confidence');
+
+    const numColorsSlider = document.getElementById('numColorsSlider');
+    const numColorsVal = document.getElementById('numColorsVal');
+    numColorsSlider.addEventListener('input', () => { numColorsVal.textContent = numColorsSlider.value; });
+    numColorsSlider.addEventListener('change', async () => {
+      await apiPost('/settings', { num_colors: parseInt(numColorsSlider.value) });
+      log('Number of colors set to ' + numColorsSlider.value);
+    });
+
+    const deltaEThresholdSlider = document.getElementById('deltaEThresholdSlider');
+    const deltaEThresholdVal = document.getElementById('deltaEThresholdVal');
+    deltaEThresholdSlider.addEventListener('input', () => { deltaEThresholdVal.textContent = parseFloat(deltaEThresholdSlider.value).toFixed(1); });
+    deltaEThresholdSlider.addEventListener('change', async () => {
+      await apiPost('/settings', { delta_e_threshold: parseFloat(deltaEThresholdSlider.value) });
+      log('Delta-E threshold set to ' + deltaEThresholdSlider.value);
+    });
+
+    wireToggle('showColorsToggle', 'show_dominant_colors');
+    wireToggle('showColorMatchToggle', 'show_reference_match');
+
+    document.getElementById('setColorReferenceBtn').addEventListener('click', () => startTeach('reference'));
+    document.getElementById('resetColorReferenceBtn').addEventListener('click', async () => {
+      const result = await apiPost('/reset-reference');
+      if (result.success) {
+        const swatch = document.getElementById('colorRefSwatch');
+        swatch.style.backgroundImage = '';
+        swatch.classList.remove('filled');
+        document.getElementById('colorRefEmptyLabel').classList.remove('hidden');
+        log('Color reference reset', 'ok');
+      } else {
+        log('Reset failed: ' + (result.error || 'unknown error'), 'warn');
+      }
+    });
 
 // ---------- Measurement calibration workflow ----------
 const calibrationCanvas = document.getElementById('calibrationCanvas');
@@ -1224,14 +1429,14 @@ calibrationCanvas.addEventListener('click', (e) => {
 calibrationApplyBtn.addEventListener('click', async () => {
   const realLength = parseFloat(calibrationLengthInput.value);
   if (!realLength || realLength <= 0) {
-    log('Enter a valid reference length in cm', 'warn');
+    log('Enter a valid reference length in mm', 'warn');
     return;
   }
   if (calibrationPoints.length !== 2) return;
 
   const [p1, p2] = calibrationPoints;
   const result = await apiPost('/calibrate', {
-    x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y, real_length_cm: realLength,
+    x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y, real_length_mm: realLength,
   });
 
   if (result.success) {
@@ -1339,15 +1544,17 @@ async function removeReference(cls, index) {
 }
 
 function startTeach(target) {
-  if (activeModuleId !== 'core-ai-identify') return;
+  if (activeModuleId !== 'core-ai-identify' && activeModuleId !== 'core-color-analysis') return;
   if (!isStreamRunning) {
     log('Start the stream before teaching', 'warn');
     return;
   }
-  const currentCount = target === 'good' ? goodThumbnails.length : badThumbnails.length;
-  if (currentCount >= MAX_REFS) {
-    log(target + ' gallery is full (max ' + MAX_REFS + ') — remove one first', 'warn');
-    return;
+  if (activeModuleId === 'core-ai-identify') {
+    const currentCount = target === 'good' ? goodThumbnails.length : badThumbnails.length;
+    if (currentCount >= MAX_REFS) {
+      log(target + ' gallery is full (max ' + MAX_REFS + ') — remove one first', 'warn');
+      return;
+    }
   }
   cancelCalibration();
 
@@ -1363,12 +1570,14 @@ function startTeach(target) {
   streamImg.style.display = 'none';
   teachCanvas.classList.remove('hidden');
   teachPanel.classList.remove('hidden');
-  teachPanel.className = 'overlay-panel teach-' + target;
-  teachHint.textContent = 'Drag a tight box around the ' + target.toUpperCase() + ' feature (' + (currentCount + 1) + '/' + MAX_REFS + ')';
+  teachPanel.className = 'overlay-panel teach-' + (target === 'reference' ? 'good' : target);
+  teachHint.textContent = target === 'reference'
+    ? 'Drag a tight box around the reference color swatch'
+    : 'Drag a tight box around the ' + target.toUpperCase() + ' feature';
   teachRetryBtn.classList.add('hidden');
   teachConfirmBtn.classList.add('hidden');
   scanline.classList.add('paused');
-  log('Teach ' + target + ' #' + currentCount + ': frame frozen. Drag a box around the feature.');
+  log('Teach ' + target + ': frame frozen. Drag a box.');
 }
 
 function redrawTeachOverlay() {
@@ -1432,6 +1641,30 @@ teachRetryBtn.addEventListener('click', () => {
 
 teachConfirmBtn.addEventListener('click', async () => {
   if (!teachRect || !teachTarget) return;
+
+  if (teachTarget === 'reference') {
+    const result = await apiPost('/teach-reference', {
+      x: teachRect.x, y: teachRect.y, w: teachRect.w, h: teachRect.h,
+    });
+    if (result.success) {
+      const thumbCanvas = document.createElement('canvas');
+      thumbCanvas.width = teachRect.w;
+      thumbCanvas.height = teachRect.h;
+      thumbCanvas.getContext('2d').drawImage(
+        teachFrozenImg, teachRect.x, teachRect.y, teachRect.w, teachRect.h,
+        0, 0, teachRect.w, teachRect.h
+      );
+      const swatch = document.getElementById('colorRefSwatch');
+      swatch.style.backgroundImage = 'url(' + thumbCanvas.toDataURL('image/png') + ')';
+      swatch.classList.add('filled');
+      document.getElementById('colorRefEmptyLabel').classList.add('hidden');
+      log('Reference color taught', 'ok');
+      endTeach();
+    } else {
+      log('Teach reference failed: ' + (result.error || 'unknown error'), 'warn');
+    }
+    return;
+  }
 
   const path = teachTarget === 'good' ? '/teach-good' : '/teach-bad';
   const result = await apiPost(path, {
@@ -1501,7 +1734,97 @@ document.getElementById('consoleClear').addEventListener('click', () => { consol
 
 log('Pi Vision AI workspace ready');
 log('Object Detection, Measurement, and AI Identify modules registered', 'ok');
-</script>
 
+// Global system status polling
+async function pollSystemStatus() {
+  try {
+    const res = await fetch('/api/v1/system/status');
+    const status = await res.json();
+    if (!status.error) {
+      document.getElementById('globalTotalCount').textContent = status.total_count;
+      document.getElementById('globalOkCount').textContent = status.ok_count;
+      document.getElementById('globalNgCount').textContent = status.ng_count;
+      
+      const lamp = document.getElementById('globalLamp');
+      if (status.latest_status === 1) {
+        lamp.style.background = 'var(--ok)';
+      } else if (status.latest_status === 2 || status.latest_status === 3) {
+        lamp.style.background = 'var(--ng)';
+      } else {
+        lamp.style.background = 'var(--hairline)';
+      }
+      
+      // Auto-switch module if changed externally (e.g., Modbus or initialization)
+      if (status.active_module_id && status.active_module_id !== activeModuleId) {
+        setActiveModule(status.active_module_id);
+      }
+    }
+  } catch(e) {}
+}
+
+setInterval(pollSystemStatus, 1000);
+pollSystemStatus();
+
+// Camera settings UI
+const autoExposureToggle = document.getElementById('autoExposureToggle');
+const exposureSlider = document.getElementById('exposureSlider');
+const exposureVal = document.getElementById('exposureVal');
+const gainSlider = document.getElementById('gainSlider');
+const gainVal = document.getElementById('gainVal');
+const autoWbToggle = document.getElementById('autoWbToggle');
+const wbSlider = document.getElementById('wbSlider');
+const wbVal = document.getElementById('wbVal');
+
+async function updateCameraSettings(payload) {
+  try {
+    const res = await fetch('/api/v1/camera/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (data.readback) {
+      if (data.readback.auto_exposure !== undefined) {
+        autoExposureToggle.classList.toggle('on', data.readback.auto_exposure);
+        exposureSlider.disabled = data.readback.auto_exposure;
+      }
+      if (data.readback.exposure !== undefined) exposureVal.textContent = data.readback.exposure;
+      if (data.readback.gain !== undefined) gainVal.textContent = data.readback.gain;
+      if (data.readback.auto_wb !== undefined) {
+        autoWbToggle.classList.toggle('on', data.readback.auto_wb);
+        wbSlider.disabled = data.readback.auto_wb;
+      }
+      if (data.readback.wb_temperature !== undefined) wbVal.textContent = data.readback.wb_temperature;
+    }
+  } catch (e) {
+    console.error("Camera update error:", e);
+  }
+}
+
+autoExposureToggle.addEventListener('click', () => {
+  const isAuto = !autoExposureToggle.classList.contains('on');
+  updateCameraSettings({ auto_exposure: isAuto });
+});
+exposureSlider.addEventListener('change', () => {
+  updateCameraSettings({ exposure: parseFloat(exposureSlider.value) });
+});
+exposureSlider.addEventListener('input', () => { exposureVal.textContent = exposureSlider.value; });
+
+gainSlider.addEventListener('change', () => {
+  updateCameraSettings({ gain: parseFloat(gainSlider.value) });
+});
+gainSlider.addEventListener('input', () => { gainVal.textContent = gainSlider.value; });
+
+autoWbToggle.addEventListener('click', () => {
+  const isAuto = !autoWbToggle.classList.contains('on');
+  updateCameraSettings({ auto_wb: isAuto });
+});
+wbSlider.addEventListener('change', () => {
+  updateCameraSettings({ wb_temperature: parseFloat(wbSlider.value) });
+});
+wbSlider.addEventListener('input', () => { wbVal.textContent = wbSlider.value; });
+
+</script>
+<div id="counters">Yield: 100% <button>Reset counters</button></div>
 </body>
 </html>
