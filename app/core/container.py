@@ -15,6 +15,8 @@ from .plugin_manager import PluginManager
 from .module_controller import ModuleController
 from .renderer_manager import RendererManager
 from .output_manager import OutputManager
+from .state import StateStore
+from .hardware import HardwareManager
 
 logger = logging.getLogger(__name__)
 
@@ -44,10 +46,15 @@ class Container:
         self.event_bus = EventBus()
         
         # Initialize Core Infrastructure
+        self.state_store = StateStore()
+        
         self.resource_manager = ResourceManager(self.event_bus)
         self.performance_monitor = PerformanceMonitor(self.event_bus)
         self.session_manager = SessionManager(self.config, self.event_bus)
         self.task_scheduler = TaskScheduler(self.event_bus)
+        
+        self.hardware_manager = HardwareManager(self.config, self.event_bus, self.state_store)
+        self.hardware_manager.initialize()
         
         # Initialize AI & Vision Engine
         self.model_registry = ModelRegistry(self.config, self.event_bus)
@@ -63,7 +70,7 @@ class Container:
         self.plugin_manager = PluginManager(self.config, self.event_bus)
         self.module_controller = ModuleController(
             self.plugin_manager, self.pipeline, self.event_bus,
-            self.ai_runtime, self.model_registry
+            self.ai_runtime, self.model_registry, self.state_store
         )
 
         logger.info("Dependency Container initialized successfully.")

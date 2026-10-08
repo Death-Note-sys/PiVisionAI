@@ -14,4 +14,4 @@ python-dotenv
 click
 pytest
 scikit-image
-pymodbus>=3.6
+pymodbus==3.6.9

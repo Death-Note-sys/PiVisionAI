@@ -95,3 +95,29 @@ class SessionMetadata(BaseModel):
     end_time: Optional[str] = None
     loaded_modules: List[str] = Field(default_factory=list)
     performance_summary: Dict[str, Any] = Field(default_factory=dict)
+
+class SystemStatus(BaseModel):
+    """Generic status response for the /api/v1/system/status endpoint."""
+    status: str = "running"
+    camera: Dict[str, Any] = Field(default_factory=dict)
+    performance: Dict[str, Any] = Field(default_factory=dict)
+    backend: Optional[Dict[str, Any]] = None
+    session: Dict[str, Any] = Field(default_factory=dict)
+    
+    is_recording: bool = False
+    trigger_mode: str = "continuous"
+    trigger_interval_seconds: float = 5.0
+    pending_trigger: bool = False
+    last_trigger_time: float = 0.0
+    
+    total_count: int = 0
+    ok_count: int = 0
+    ng_count: int = 0
+    error_state: int = 0
+    latest_ng_metadata: Dict[str, Any] = Field(default_factory=dict)
+    
+    modbus_enabled: bool = False
+    modbus_port: int = 5020
+    
+    active_module_id: Optional[str] = None
+    module_state: Dict[str, Any] = Field(default_factory=dict)
