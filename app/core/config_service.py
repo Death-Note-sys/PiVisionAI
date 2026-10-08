@@ -27,9 +27,31 @@ class ConfigService:
     """Centralized configuration manager avoiding direct .env reads elsewhere."""
     
     def __init__(self, env_file: str = ".env"):
-        self._settings = AppSettings()
         self.env_file = env_file
+        self.settings_file = os.path.join(os.getenv("PI_VISION_DATA_DIR", "data"), "settings.json")
+        self._settings = AppSettings()
         self._load_env()
+        self._load_json()
+
+    def _load_json(self) -> None:
+        if os.path.exists(self.settings_file):
+            try:
+                with open(self.settings_file, "r") as f:
+                    data = json.load(f)
+                    current_dict = self._settings.model_dump()
+                    current_dict.update(data)
+                    self._settings = AppSettings(**current_dict)
+                logger.info("Loaded global settings from settings.json")
+            except Exception as e:
+                logger.error(f"Failed to load settings.json: {e}")
+
+    def _save_json(self) -> None:
+        try:
+            os.makedirs(os.path.dirname(self.settings_file), exist_ok=True)
+            with open(self.settings_file, "w") as f:
+                json.dump(self._settings.model_dump(), f, indent=4)
+        except Exception as e:
+            logger.error(f"Failed to save settings.json: {e}")
 
     def _load_env(self) -> None:
         """Load configuration from environment variables and .env file."""
@@ -66,6 +88,7 @@ class ConfigService:
         current_dict = self._settings.model_dump()
         current_dict.update(new_settings)
         self._settings = AppSettings(**current_dict)
+        self._save_json()
         logger.info("Application settings updated at runtime.")
 
     def get(self, key: str, default: Any = None) -> Any:

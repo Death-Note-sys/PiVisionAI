@@ -640,6 +640,13 @@
     </select>
     <input type="number" id="triggerIntervalInput" class="toolbar-number hidden" min="0.5" step="0.5" value="5" title="Interval (seconds)">
     <button class="vp-btn hidden" id="fireTriggerBtn"><i class="ti ti-bolt"></i>Fire</button>
+    <div class="toolbar-divider"></div>
+    <div class="global-counts" style="display:flex; gap:16px; align-items:center; font-family: var(--font-data); font-size: 13px;">
+      <div id="globalLamp" style="width: 16px; height: 16px; border-radius: 50%; background: var(--hairline); transition: background 0.2s;"></div>
+      <div>OK: <span id="globalOkCount" style="color: var(--ok)">0</span></div>
+      <div>NG: <span id="globalNgCount" style="color: var(--ng)">0</span></div>
+      <div>Total: <span id="globalTotalCount">0</span></div>
+    </div>
     <div class="toolbar-spacer"></div>
     <div class="backend-badge"><span class="dot"></span><span id="backendLabel">CPU backend</span></div>
   </div>
@@ -932,8 +939,55 @@ function setActiveModule(moduleId) {
   }
 
   document.getElementById('statStatus').textContent = 'Idle';
-  const names = { 'core-object-detection': 'Object Detection', 'core-measurement': 'Measurement', 'core-ai-identify': 'AI Identify' };
-  log('Switched to ' + names[moduleId]);
+  const names = { 'core-object-detection': 'Object Detection', 'core-measurement': 'Measurement', 'core-ai-identify': 'AI Identify', 'core-ocr': 'OCR', 'core-color-analysis': 'Color Analysis' };
+  log('Switched to ' + (names[moduleId] || moduleId));
+  
+  // Initialize controls and gallery from server state
+  apiGet('/status').then(status => {
+    if (status && !status.error) {
+      const settings = status.settings || {};
+      
+      if (moduleId === 'core-color-analysis') {
+        if (settings.delta_e_threshold !== undefined) {
+          document.getElementById('deltaEThreshold').value = settings.delta_e_threshold;
+          document.getElementById('deltaEThresholdVal').textContent = settings.delta_e_threshold;
+        }
+        if (status.telemetry && status.telemetry.reference_status === 'Taught') {
+          const swatch = document.getElementById('referenceSwatch');
+          swatch.style.backgroundImage = `url('/api/v1/modules/active/gallery/color/0?t=${Date.now()}')`;
+          swatch.style.backgroundSize = 'cover';
+        } else {
+          document.getElementById('referenceSwatch').style.backgroundImage = 'none';
+        }
+      } else if (moduleId === 'core-ai-identify') {
+        if (settings.match_threshold !== undefined) {
+          document.getElementById('matchThreshold').value = settings.match_threshold;
+          document.getElementById('matchThresholdVal').textContent = settings.match_threshold;
+        }
+        
+        // Rebuild galleries
+        const telemetry = status.telemetry || {};
+        const gc = telemetry.good_reference_count || 0;
+        const bc = telemetry.bad_reference_count || 0;
+        
+        goodThumbnails.length = 0;
+        for (let i = 0; i < gc; i++) {
+          goodThumbnails.push(`/api/v1/modules/active/gallery/good/${i}`);
+        }
+        renderGallery(document.getElementById('goodGallery'), goodThumbnails, 'good');
+        
+        badThumbnails.length = 0;
+        for (let i = 0; i < bc; i++) {
+          badThumbnails.push(`/api/v1/modules/active/gallery/bad/${i}`);
+        }
+        renderGallery(document.getElementById('badGallery'), badThumbnails, 'bad');
+      } else if (moduleId === 'core-measurement') {
+         if (settings.pixels_per_cm !== undefined && settings.pixels_per_cm !== null) {
+            document.getElementById('statPxPerCm').textContent = settings.pixels_per_cm.toFixed(2);
+         }
+      }
+    }
+  }).catch(e => console.error("Failed to fetch initial status", e));
 }
 
 document.querySelectorAll('.tool-btn[data-module]').forEach(btn => {
@@ -1653,7 +1707,37 @@ document.getElementById('consoleClear').addEventListener('click', () => { consol
 
 log('Pi Vision AI workspace ready');
 log('Object Detection, Measurement, and AI Identify modules registered', 'ok');
-</script>
 
+// Global system status polling
+async function pollSystemStatus() {
+  try {
+    const res = await fetch('/api/v1/system/status');
+    const status = await res.json();
+    if (!status.error) {
+      document.getElementById('globalTotalCount').textContent = status.total_count;
+      document.getElementById('globalOkCount').textContent = status.ok_count;
+      document.getElementById('globalNgCount').textContent = status.ng_count;
+      
+      const lamp = document.getElementById('globalLamp');
+      if (status.latest_status === 1) {
+        lamp.style.background = 'var(--ok)';
+      } else if (status.latest_status === 2 || status.latest_status === 3) {
+        lamp.style.background = 'var(--ng)';
+      } else {
+        lamp.style.background = 'var(--hairline)';
+      }
+      
+      // Auto-switch module if changed externally (e.g., Modbus or initialization)
+      if (status.active_module_id && status.active_module_id !== activeModuleId) {
+        setActiveModule(status.active_module_id);
+      }
+    }
+  } catch(e) {}
+}
+
+setInterval(pollSystemStatus, 1000);
+pollSystemStatus();
+
+</script>
 </body>
 </html>

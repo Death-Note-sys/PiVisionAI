@@ -102,4 +102,24 @@ def delete_active(action):
             return jsonify({"success": True, "result": result})
         except Exception as e:
             return jsonify({"error": str(e)}), 500
-    return jsonify({"error": "Unknown DELETE path"}), 404
+@bp.route('/active/gallery/<ref_type>/<int:index>', methods=['GET'])
+def get_gallery_image(ref_type, index):
+    from flask import send_file
+    import os
+    from app.core.container import Container
+    
+    container = Container.get_instance()
+    if not container or not container.module_controller.active_metadata:
+        return "No active module", 404
+        
+    meta = container.module_controller.active_metadata
+    module_dir = container.session_manager.get_data_dir(f"modules/{meta.id}")
+    
+    if ref_type == "color":
+        path = os.path.join(module_dir, "reference.png")
+    else:
+        path = os.path.join(module_dir, f"{ref_type}_{index}.png")
+        
+    if os.path.exists(path):
+        return send_file(path, mimetype='image/png')
+    return "Not found", 404
