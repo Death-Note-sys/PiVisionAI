@@ -681,7 +681,7 @@
 
         <div class="overlay-panel hidden" id="calibrationPanel">
           <span id="calibrationHint">Click two points on a known reference length</span>
-          <input type="number" id="calibrationLengthInput" placeholder="cm" min="0.1" step="0.1" class="hidden">
+          <input type="number" id="calibrationLengthInput" placeholder="mm" min="1" step="1" class="hidden">
           <button class="vp-btn primary hidden" id="calibrationApplyBtn">Apply</button>
           <button class="vp-btn" id="calibrationCancelBtn">Cancel</button>
         </div>
@@ -715,7 +715,7 @@
         <div class="measurement-only hidden">
           <div class="stat-row"><span class="label">Measurements</span><span class="value accent" id="statMeasurements">0</span></div>
           <div class="stat-row"><span class="label">Calibration</span><span class="value warn" id="statCalibration">Uncalibrated</span></div>
-          <div class="stat-row"><span class="label">Px / cm</span><span class="value" id="statPxPerCm">—</span></div>
+          <div class="stat-row"><span class="label">Px / mm</span><span class="value" id="statPxPerMm">—</span></div>
         </div>
 
         <div class="ai-identify-only hidden">
@@ -766,7 +766,7 @@
         <div class="field">
           <div class="field-label"><span>Unit</span></div>
           <select class="inline-select" id="unitSelect">
-            <option value="cm">Centimeters</option>
+            <option value="mm">Millimeters</option>
             <option value="px">Pixels</option>
           </select>
         </div>
@@ -850,6 +850,31 @@
         </div>
         <button class="full-btn" id="setColorReferenceBtn"><i class="ti ti-eyedropper"></i> Set Reference Color</button>
         <button class="full-btn neutral" id="resetColorReferenceBtn" style="margin-top:6px;"><i class="ti ti-refresh"></i> Reset Reference</button>
+      </div>
+      </div>
+
+      <div class="inspector-section">
+        <p class="inspector-title">Camera settings</p>
+        <div class="toggle-row">
+          <span>Auto Exposure</span>
+          <div class="switch on" id="autoExposureToggle"></div>
+        </div>
+        <div class="field">
+          <div class="field-label"><span>Exposure</span><span class="field-value" id="exposureVal">-5</span></div>
+          <input type="range" id="exposureSlider" min="-13" max="0" step="1" value="-5" disabled>
+        </div>
+        <div class="field">
+          <div class="field-label"><span>Gain</span><span class="field-value" id="gainVal">0</span></div>
+          <input type="range" id="gainSlider" min="0" max="255" step="1" value="0">
+        </div>
+        <div class="toggle-row">
+          <span>Auto White Balance</span>
+          <div class="switch on" id="autoWbToggle"></div>
+        </div>
+        <div class="field">
+          <div class="field-label"><span>WB Temp</span><span class="field-value" id="wbVal">4600</span></div>
+          <input type="range" id="wbSlider" min="2000" max="10000" step="100" value="4600" disabled>
+        </div>
       </div>
     </div>
 
@@ -949,7 +974,7 @@ function setActiveModule(moduleId) {
       
       if (moduleId === 'core-color-analysis') {
         if (settings.delta_e_threshold !== undefined) {
-          document.getElementById('deltaEThreshold').value = settings.delta_e_threshold;
+          document.getElementById('deltaEThresholdSlider').value = settings.delta_e_threshold;
           document.getElementById('deltaEThresholdVal').textContent = settings.delta_e_threshold;
         }
         if (status.telemetry && status.telemetry.reference_status === 'Taught') {
@@ -961,8 +986,10 @@ function setActiveModule(moduleId) {
         }
       } else if (moduleId === 'core-ai-identify') {
         if (settings.match_threshold !== undefined) {
-          document.getElementById('matchThreshold').value = settings.match_threshold;
-          document.getElementById('matchThresholdVal').textContent = settings.match_threshold;
+          const matchEl = document.getElementById('matchThresholdSlider');
+          if (matchEl) matchEl.value = settings.match_threshold;
+          const matchValEl = document.getElementById('matchThresholdVal');
+          if (matchValEl) matchValEl.textContent = settings.match_threshold;
         }
         
         // Rebuild galleries
@@ -982,8 +1009,8 @@ function setActiveModule(moduleId) {
         }
         renderGallery(document.getElementById('badGallery'), badThumbnails, 'bad');
       } else if (moduleId === 'core-measurement') {
-         if (settings.pixels_per_cm !== undefined && settings.pixels_per_cm !== null) {
-            document.getElementById('statPxPerCm').textContent = settings.pixels_per_cm.toFixed(2);
+         if (settings.pixels_per_mm !== undefined && settings.pixels_per_mm !== null) {
+            document.getElementById('statPxPerMm').textContent = settings.pixels_per_mm.toFixed(2);
          }
       }
     }
@@ -1126,7 +1153,7 @@ function beginPolling() {
           calEl.classList.toggle('ok', telemetry.calibration_status === 'Calibrated');
           calEl.classList.toggle('warn', telemetry.calibration_status !== 'Calibrated');
         }
-        document.getElementById('statPxPerCm').textContent = telemetry.pixels_per_cm ? telemetry.pixels_per_cm.toFixed(2) : '—';
+        document.getElementById('statPxPerMm').textContent = telemetry.pixels_per_mm ? telemetry.pixels_per_mm.toFixed(2) : '—';
 
       } else if (activeModuleId === 'core-ai-identify') {
         document.getElementById('statLocated').textContent = telemetry.located ? 'Yes' : 'No';
@@ -1402,14 +1429,14 @@ calibrationCanvas.addEventListener('click', (e) => {
 calibrationApplyBtn.addEventListener('click', async () => {
   const realLength = parseFloat(calibrationLengthInput.value);
   if (!realLength || realLength <= 0) {
-    log('Enter a valid reference length in cm', 'warn');
+    log('Enter a valid reference length in mm', 'warn');
     return;
   }
   if (calibrationPoints.length !== 2) return;
 
   const [p1, p2] = calibrationPoints;
   const result = await apiPost('/calibrate', {
-    x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y, real_length_cm: realLength,
+    x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y, real_length_mm: realLength,
   });
 
   if (result.success) {
@@ -1737,6 +1764,65 @@ async function pollSystemStatus() {
 
 setInterval(pollSystemStatus, 1000);
 pollSystemStatus();
+
+// Camera settings UI
+const autoExposureToggle = document.getElementById('autoExposureToggle');
+const exposureSlider = document.getElementById('exposureSlider');
+const exposureVal = document.getElementById('exposureVal');
+const gainSlider = document.getElementById('gainSlider');
+const gainVal = document.getElementById('gainVal');
+const autoWbToggle = document.getElementById('autoWbToggle');
+const wbSlider = document.getElementById('wbSlider');
+const wbVal = document.getElementById('wbVal');
+
+async function updateCameraSettings(payload) {
+  try {
+    const res = await fetch('/api/v1/camera/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (data.readback) {
+      if (data.readback.auto_exposure !== undefined) {
+        autoExposureToggle.classList.toggle('on', data.readback.auto_exposure);
+        exposureSlider.disabled = data.readback.auto_exposure;
+      }
+      if (data.readback.exposure !== undefined) exposureVal.textContent = data.readback.exposure;
+      if (data.readback.gain !== undefined) gainVal.textContent = data.readback.gain;
+      if (data.readback.auto_wb !== undefined) {
+        autoWbToggle.classList.toggle('on', data.readback.auto_wb);
+        wbSlider.disabled = data.readback.auto_wb;
+      }
+      if (data.readback.wb_temperature !== undefined) wbVal.textContent = data.readback.wb_temperature;
+    }
+  } catch (e) {
+    console.error("Camera update error:", e);
+  }
+}
+
+autoExposureToggle.addEventListener('click', () => {
+  const isAuto = !autoExposureToggle.classList.contains('on');
+  updateCameraSettings({ auto_exposure: isAuto });
+});
+exposureSlider.addEventListener('change', () => {
+  updateCameraSettings({ exposure: parseFloat(exposureSlider.value) });
+});
+exposureSlider.addEventListener('input', () => { exposureVal.textContent = exposureSlider.value; });
+
+gainSlider.addEventListener('change', () => {
+  updateCameraSettings({ gain: parseFloat(gainSlider.value) });
+});
+gainSlider.addEventListener('input', () => { gainVal.textContent = gainSlider.value; });
+
+autoWbToggle.addEventListener('click', () => {
+  const isAuto = !autoWbToggle.classList.contains('on');
+  updateCameraSettings({ auto_wb: isAuto });
+});
+wbSlider.addEventListener('change', () => {
+  updateCameraSettings({ wb_temperature: parseFloat(wbSlider.value) });
+});
+wbSlider.addEventListener('input', () => { wbVal.textContent = wbSlider.value; });
 
 </script>
 </body>

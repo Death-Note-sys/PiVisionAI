@@ -24,8 +24,8 @@ class MeasurementController(BaseModuleController):
             
         # Load calibration data
         saved_data = self.load_data()
-        self.pixels_per_cm = saved_data.get("pixels_per_cm")
-        self.calibration_status = "Calibrated" if self.pixels_per_cm else "Uncalibrated"
+        self.pixels_per_mm = saved_data.get("pixels_per_mm")
+        self.calibration_status = "Calibrated" if self.pixels_per_mm else "Uncalibrated"
         
         self.last_result: MeasurementResult = MeasurementResult()
 
@@ -39,19 +39,19 @@ class MeasurementController(BaseModuleController):
             return True
         return False
 
-    def calibrate(self, x1: int, y1: int, x2: int, y2: int, real_length_cm: float) -> bool:
-        """Set pixels-per-cm from two clicked points and a known real-world distance."""
+    def calibrate(self, x1: int, y1: int, x2: int, y2: int, real_length_mm: float) -> bool:
+        """Set pixels-per-mm from two clicked points and a known real-world distance."""
         pixel_distance = math.hypot(x2 - x1, y2 - y1)
-        if pixel_distance <= 0 or real_length_cm <= 0:
+        if pixel_distance <= 0 or real_length_mm <= 0:
             logger.error("Calibration failed: zero-length reference line or invalid real length.")
             return False
-        self.pixels_per_cm = pixel_distance / real_length_cm
+        self.pixels_per_mm = pixel_distance / real_length_mm
         self.calibration_status = "Calibrated"
         
-        self.save_data({"pixels_per_cm": self.pixels_per_cm})
+        self.save_data({"pixels_per_mm": self.pixels_per_mm})
         
-        self.event_bus.publish("MeasurementCalibrated", {"pixels_per_cm": self.pixels_per_cm})
-        logger.info(f"Measurement calibrated: {self.pixels_per_cm:.3f} px/cm")
+        self.event_bus.publish("MeasurementCalibrated", {"pixels_per_mm": self.pixels_per_mm})
+        logger.info(f"Measurement calibrated: {self.pixels_per_mm:.3f} px/mm")
         return True
 
     def process(self, context: Dict[str, Any]) -> MeasurementResult:
@@ -67,7 +67,7 @@ class MeasurementController(BaseModuleController):
             contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         except Exception as e:
             logger.error(f"Contour detection failed: {e}")
-            return MeasurementResult(calibration_status=self.calibration_status, pixels_per_cm=self.pixels_per_cm)
+            return MeasurementResult(calibration_status=self.calibration_status, pixels_per_mm=self.pixels_per_mm)
 
         measurements = []
         for c in contours:
@@ -84,17 +84,17 @@ class MeasurementController(BaseModuleController):
                 "height_px": float(h),
                 "perimeter_px": float(perimeter_px),
                 "area_px": float(area_px),
-                "width_cm": None,
-                "height_cm": None,
-                "perimeter_cm": None,
-                "area_cm2": None,
+                "width_mm": None,
+                "height_mm": None,
+                "perimeter_mm": None,
+                "area_mm2": None,
             }
 
-            if self.pixels_per_cm:
-                entry["width_cm"] = round(w / self.pixels_per_cm, 2)
-                entry["height_cm"] = round(h / self.pixels_per_cm, 2)
-                entry["perimeter_cm"] = round(perimeter_px / self.pixels_per_cm, 2)
-                entry["area_cm2"] = round(area_px / (self.pixels_per_cm ** 2), 2)
+            if self.pixels_per_mm:
+                entry["width_mm"] = round(w / self.pixels_per_mm, 2)
+                entry["height_mm"] = round(h / self.pixels_per_mm, 2)
+                entry["perimeter_mm"] = round(perimeter_px / self.pixels_per_mm, 2)
+                entry["area_mm2"] = round(area_px / (self.pixels_per_mm ** 2), 2)
 
             measurements.append(entry)
 
@@ -103,7 +103,7 @@ class MeasurementController(BaseModuleController):
         result = MeasurementResult(
             measurements=measurements,
             calibration_status=self.calibration_status,
-            pixels_per_cm=self.pixels_per_cm,
+            pixels_per_mm=self.pixels_per_mm,
             latency_ms=latency_ms,
             timestamp=time.time(),
         )

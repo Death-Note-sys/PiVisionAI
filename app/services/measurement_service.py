@@ -54,12 +54,12 @@ class MeasurementService:
         service = self.container.module_controller.get_active_service()
         return service.update_settings(settings) if service else False
 
-    def calibrate(self, x1: int, y1: int, x2: int, y2: int, real_length_cm: float) -> bool:
+    def calibrate(self, x1: int, y1: int, x2: int, y2: int, real_length_mm: float) -> bool:
         if not self._ensure_active():
             return False
         service = self.container.module_controller.get_active_service()
         if service and hasattr(service, "calibrate"):
-            return service.calibrate(x1, y1, x2, y2, real_length_cm)
+            return service.calibrate(x1, y1, x2, y2, real_length_mm)
         return False
 
     def get_latest_jpeg(self) -> bytes:

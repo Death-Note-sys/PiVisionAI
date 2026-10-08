@@ -4,12 +4,13 @@ from typing import Optional, Dict, Any
 class CalibrationRequest(BaseModel):
     """Payload for POST /api/v1/measurement/calibrate. x1/y1/x2/y2 are pixel
     coordinates of two points the operator clicked on the frame;
-    real_length_cm is the true physical distance between them."""
+    real_length_mm is the true physical distance between them."""
     x1: int
     y1: int
     x2: int
     y2: int
-    real_length_cm: float = Field(gt=0)
+    real_length_mm: Optional[float] = None
+    real_length_cm: Optional[float] = None
 
 class UpdateMeasurementSettingsRequest(BaseModel):
     canny_low: Optional[int] = Field(None, ge=0, le=255)

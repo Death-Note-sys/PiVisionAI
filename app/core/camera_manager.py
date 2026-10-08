@@ -38,6 +38,50 @@ class CameraManager:
         self._stop_event = threading.Event()
         self._capture_thread = None
         self._processing_thread = None
+        self._cap_lock = threading.Lock()
+        self.camera_settings = {}
+        
+    def apply_settings(self, settings: Dict[str, Any]) -> Dict[str, Any]:
+        """Apply camera settings and return read-back values."""
+        self.camera_settings.update(settings)
+        if not self.cap or not self.is_connected:
+            return {}
+            
+        readback = {}
+        with self._cap_lock:
+            # Auto Exposure
+            if "auto_exposure" in settings:
+                # DSHOW: 0.25 manual, 0.75 auto
+                val = 0.75 if settings["auto_exposure"] else 0.25
+                self.cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, val)
+                actual = self.cap.get(cv2.CAP_PROP_AUTO_EXPOSURE)
+                readback["auto_exposure"] = actual > 0.5
+                
+            if "exposure" in settings and not settings.get("auto_exposure", True):
+                self.cap.set(cv2.CAP_PROP_EXPOSURE, settings["exposure"])
+                readback["exposure"] = self.cap.get(cv2.CAP_PROP_EXPOSURE)
+                
+            if "gain" in settings:
+                self.cap.set(cv2.CAP_PROP_GAIN, settings["gain"])
+                readback["gain"] = self.cap.get(cv2.CAP_PROP_GAIN)
+                
+            if "auto_wb" in settings:
+                self.cap.set(cv2.CAP_PROP_AUTO_WB, 1.0 if settings["auto_wb"] else 0.0)
+                readback["auto_wb"] = self.cap.get(cv2.CAP_PROP_AUTO_WB) > 0.5
+                
+            if "wb_temperature" in settings and not settings.get("auto_wb", True):
+                self.cap.set(cv2.CAP_PROP_WB_TEMPERATURE, settings["wb_temperature"])
+                readback["wb_temperature"] = self.cap.get(cv2.CAP_PROP_WB_TEMPERATURE)
+                
+            if "autofocus" in settings:
+                self.cap.set(cv2.CAP_PROP_AUTOFOCUS, 1.0 if settings["autofocus"] else 0.0)
+                readback["autofocus"] = self.cap.get(cv2.CAP_PROP_AUTOFOCUS) > 0.5
+                
+            if "focus" in settings and not settings.get("autofocus", True):
+                self.cap.set(cv2.CAP_PROP_FOCUS, settings["focus"])
+                readback["focus"] = self.cap.get(cv2.CAP_PROP_FOCUS)
+                
+        return readback
 
     def start(self):
         """Start the capture and processing threads."""
@@ -70,25 +114,40 @@ class CameraManager:
         logger.info("CameraManager stopped.")
 
     def _open_camera(self) -> bool:
-        if self.cap:
-            self.cap.release()
+        with self._cap_lock:
+            if self.cap:
+                self.cap.release()
+                
+            backends = [cv2.CAP_DSHOW, cv2.CAP_MSMF, cv2.CAP_ANY] if os.name == 'nt' else [cv2.CAP_ANY]
+            configured_backend = self.config.get("camera_backend", "auto")
             
-        self.cap = cv2.VideoCapture(self.camera_index)
-        # Attempt to set high resolution if configured
-        w, h = map(int, self.config.get("camera_resolution", "1280x720").split('x'))
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, w)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, h)
-        self.cap.set(cv2.CAP_PROP_FPS, self.target_fps)
-        
-        if self.cap.isOpened():
+            opened = False
+            for backend in backends:
+                self.cap = cv2.VideoCapture(self.camera_index, backend)
+                if self.cap.isOpened():
+                    opened = True
+                    break
+                    
+            if not opened:
+                self.is_connected = False
+                logger.error(f"Failed to open Camera {self.camera_index}.")
+                return False
+                
+            # Attempt to set high resolution if configured
+            w, h = map(int, self.config.get("camera_resolution", "1280x720").split('x'))
+            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, w)
+            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, h)
+            self.cap.set(cv2.CAP_PROP_FPS, self.target_fps)
+            
             time.sleep(1.0)
             self.is_connected = True
             logger.info(f"Camera {self.camera_index} opened.")
-            return True
             
-        self.is_connected = False
-        logger.error(f"Failed to open Camera {self.camera_index}.")
-        return False
+        # Apply any pending settings
+        if self.camera_settings:
+            self.apply_settings(self.camera_settings)
+            
+        return True
 
     def _capture_loop(self):
         """Producer: Grab frames as fast as hardware allows to clear buffers."""
@@ -98,7 +157,9 @@ class CameraManager:
                 self._open_camera()
                 continue
                 
-            ret, frame = self.cap.read()
+            with self._cap_lock:
+                ret, frame = self.cap.read()
+                
             if ret:
                 self._raw_frames.append(frame)
                 self.event_bus.publish("FrameCaptured")

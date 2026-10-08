@@ -74,7 +74,7 @@ def update_settings():
 
 @bp.route('/calibrate', methods=['POST'])
 def calibrate():
-    """Calibrate pixels-per-cm from two clicked points and a known real-world length."""
+    """Calibrate pixels-per-mm from two clicked points and a known real-world length."""
     data = request.get_json()
     if not data:
         return jsonify({"error": "No JSON payload provided"}), 400
@@ -82,8 +82,16 @@ def calibrate():
         validated = CalibrationRequest(**data)
     except ValidationError as e:
         return jsonify({"error": e.errors()}), 400
+        
+    mm_len = validated.real_length_mm
+    if mm_len is None and validated.real_length_cm is not None:
+        mm_len = validated.real_length_cm * 10.0
+        
+    if mm_len is None or mm_len <= 0:
+        return jsonify({"error": "real_length_mm must be positive"}), 400
+        
     if measurement_service.calibrate(
-        validated.x1, validated.y1, validated.x2, validated.y2, validated.real_length_cm
+        validated.x1, validated.y1, validated.x2, validated.y2, mm_len
     ):
         return jsonify({"success": True})
     return jsonify({"error": "Calibration failed — check that the two points are not identical"}), 500

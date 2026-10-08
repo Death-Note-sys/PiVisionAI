@@ -56,7 +56,8 @@ def test_coordinator_handles_ng_result():
     assert state_store.latest_ng_metadata["module_id"] == "test_module"
     
     # Should save NG frame
-    output_manager.save_ng.assert_called_once_with("mock_frame", state_store.latest_ng_metadata)
+    from unittest.mock import ANY
+    output_manager.save_ng.assert_called_once_with("mock_frame", state_store.latest_ng_metadata, ANY)
     
 def test_coordinator_ignores_non_inspection_results():
     event_bus = MagicMock()
