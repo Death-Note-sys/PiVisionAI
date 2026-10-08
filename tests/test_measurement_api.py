@@ -43,7 +43,7 @@ def test_calibrate_rejects_missing_fields(client, mock_measurement_service):
 def test_calibrate_rejects_zero_real_length(client, mock_measurement_service):
     response = client.post(
         "/api/v1/measurement/calibrate",
-        json={"x1": 0, "y1": 0, "x2": 100, "y2": 0, "real_length_cm": 0},
+        json={"x1": 0, "y1": 0, "x2": 100, "y2": 0, "real_length_mm": 0},
     )
 
     assert response.status_code == 400
@@ -54,7 +54,7 @@ def test_calibrate_success(client, mock_measurement_service):
 
     response = client.post(
         "/api/v1/measurement/calibrate",
-        json={"x1": 0, "y1": 0, "x2": 100, "y2": 0, "real_length_cm": 10.0},
+        json={"x1": 0, "y1": 0, "x2": 100, "y2": 0, "real_length_mm": 10.0},
     )
 
     assert response.status_code == 200
@@ -66,7 +66,7 @@ def test_calibrate_failure_returns_500(client, mock_measurement_service):
 
     response = client.post(
         "/api/v1/measurement/calibrate",
-        json={"x1": 5, "y1": 5, "x2": 5, "y2": 5, "real_length_cm": 10.0},
+        json={"x1": 5, "y1": 5, "x2": 5, "y2": 5, "real_length_mm": 10.0},
     )
 
     assert response.status_code == 500

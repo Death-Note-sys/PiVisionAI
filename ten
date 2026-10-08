@@ -1,0 +1,15 @@
+[33m74a7c55[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m Complete all final checklist items: SQLite, Camera API, mm transition
+[33mb43da4e[m Phase 6-8: UI Refactoring, Global Settings Persistence, and Final Polish
+[33m86896b2[m Phase 5: Modbus Polling Updates and Map adjustments
+[33m8b6be63[m Phase 4: Generic Persistence Layer and active module routing
+[33m49ab1f3[m Phase 3: Event-Driven Inspection Coordinator
+[33m98a2764[m Phase 2: Core Hardware Abstractions & State
+[33m3ced98e[m Phase 1: Bug fixes & State Management
+[33meca1d09[m chore(phase0): remove legacy directories and scripts
+[33mda3bef4[m[33m ([m[1;31morigin/main[m[33m)[m feat: add Color Analysis REST API (start/stop/settings/teach-reference/reset-reference/stream)
+[33m3209800[m feat: add Color Analysis module (K-means dominant color extraction, optional taught-reference matching via CIE Delta-E)
+[33mb36fc8c[m feat: add standalone OCR benchmark with canvas_size sweep
+[33m45280b5[m docs: rewrite README with full project reference
+[33m128084f[m feat: Enable OCR module in UI and add configurable canvas_size
+[33m2324aff[m feat: AI Identify similarity floor, 20-image gallery, and internal benchmark
+[33m9a20d55[m feat: Add multi-image gallery teach UI and per-image deletion to frontend
