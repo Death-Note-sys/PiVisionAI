@@ -22,15 +22,26 @@ class InspectionCoordinator:
             
         # Determine if it's an inspection result
         is_ok = None
+        status = 0
         if hasattr(result, "match"):
             if result.match is not None:
                 is_ok = result.match
+                status = 1 if is_ok else 2
+        elif hasattr(result, "classification"):
+            if result.classification in ("Good", "Bad", "Uncertain"):
+                is_ok = result.classification == "Good"
+                if result.classification == "Good": status = 1
+                elif result.classification == "Bad": status = 2
+                elif result.classification == "Uncertain": status = 3
         elif hasattr(result, "is_ok"):
             is_ok = result.is_ok
+            status = 1 if is_ok else 2
             
         if is_ok is None:
             # Not an inspectable result or undetermined
             return
+            
+        self.state_store.update_status(status)
             
         if is_ok:
             self.state_store.increment_ok()

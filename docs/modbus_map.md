@@ -10,11 +10,13 @@ Counters are represented as 32-bit unsigned integers, mapped to two 16-bit holdi
 
 ## Holding Registers (4x)
 
-| Register | Name | Type | R/W | Description |
-| :--- | :--- | :--- | :--- | :--- |
-| 40001 (0) | Heartbeat | UInt16 | R | Toggles / increments every second to indicate system alive. |
-| 40002 (1) | Trigger | UInt16 | R/W | Write `1` to trigger an inspection (in Modbus/External trigger mode). Auto-resets to `0`. |
-| 40003-40004 (2-3) | Total Count | UInt32 | R | Total inspections performed (Total = OK + NG). |
-| 40005-40006 (4-5) | OK Count | UInt32 | R | Count of passed inspections. |
-| 40007-40008 (6-7) | NG Count | UInt32 | R | Count of failed/uncertain inspections. Uncertain is a subset of NG. |
-| 40009 (8) | Error State | UInt16 | R | System error code (0 = Normal, 1 = Camera Error, etc.). |
+| Register | Address | Name | Type | R/W | Description |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| 40001 | 0 | Active Module ID | UInt16 | R | 1=OCR, 2=Color, 3=AI Identify, 4=Object Detection, 5=Measurement |
+| 40002 | 1 | Overall Status | UInt16 | R | 0=Idle, 1=OK, 2=NG, 3=Uncertain (Uncertain is a subset of NG) |
+| 40003-40004 | 2-3 | Total Count | UInt32 | R | Total inspections performed (Total = OK + NG). |
+| 40005-40006 | 4-5 | OK Count | UInt32 | R | Count of passed inspections. |
+| 40007-40008 | 6-7 | NG Count | UInt32 | R | Count of failed/uncertain inspections. |
+| 40009 | 8 | Heartbeat | UInt16 | R | Toggles / increments every second to indicate system alive. |
+| 40010 | 9 | Trigger | UInt16 | R/W | Write `1` to trigger an inspection (in Modbus/External trigger mode). Auto-resets to `0`. |
+| 40011 | 10 | Error State | UInt16 | R | System error code (0 = Normal, 1 = Camera Error, etc.). |

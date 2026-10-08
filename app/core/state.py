@@ -12,6 +12,7 @@ class StateStore:
         
         # System State
         self.error_state = 0
+        self.latest_status = 0 # 0=Idle, 1=OK, 2=NG, 3=Uncertain
         self.latest_ng_metadata: Dict[str, Any] = {}
         
         # Module Runtime States
@@ -40,6 +41,10 @@ class StateStore:
         with self._lock:
             self.error_state = error_code
             
+    def update_status(self, status: int):
+        with self._lock:
+            self.latest_status = status
+            
     def update(self, module_id: str, patch: Dict[str, Any]):
         """Read-merge-write under a lock for per-module state."""
         with self._lock:
@@ -58,5 +63,6 @@ class StateStore:
                 "ok_count": self.ok_count,
                 "ng_count": self.ng_count,
                 "error_state": self.error_state,
+                "latest_status": self.latest_status,
                 "latest_ng_metadata": self.latest_ng_metadata
             }

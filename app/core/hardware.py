@@ -26,8 +26,8 @@ class HardwareManager:
         self._sync_thread: Optional[threading.Thread] = None
         self._running = False
         
-        # 0: Heartbeat, 1: Trigger, 2-3: Total, 4-5: OK, 6-7: NG, 8: Error
-        self.store = ModbusSequentialDataBlock(0, [0] * 10)
+        # 0: Active Module ID, 1: Overall Status, 2-3: Total, 4-5: OK, 6-7: NG, 8: Heartbeat, 9: Trigger, 10: Error
+        self.store = ModbusSequentialDataBlock(0, [0] * 11)
         self.context = ModbusServerContext(slaves=ModbusSlaveContext(
             di=self.store, co=self.store, hr=self.store, ir=self.store
         ), single=True)
@@ -68,14 +68,13 @@ class HardwareManager:
         loop_count = 0
         while self._running:
             try:
-                # Read Trigger Register (Address 1 in 0-indexed block)
-                # fx=3 is holding registers, but directly on DataBlock we don't pass fx
-                trigger_val = self.store.getValues(1, 1)[0]
+                # Read Trigger Register (Address 9 in 0-indexed block)
+                trigger_val = self.store.getValues(9, 1)[0]
                 if trigger_val == 1:
                     logger.info("Modbus trigger received.")
                     self.event_bus.publish("HardwareTrigger", {})
                     # Reset trigger to 0
-                    self.store.setValues(1, [0])
+                    self.store.setValues(9, [0])
                     
                 # Update Heartbeat every 10 iterations (approx 1 second)
                 loop_count += 1
@@ -83,8 +82,25 @@ class HardwareManager:
                     heartbeat = (heartbeat + 1) % 65535
                     loop_count = 0
                 
+                # Fetch Active Module
+                active_str = ""
+                from app.core.container import Container
+                container = Container.get_instance()
+                if container and container.module_controller and container.module_controller.active_metadata:
+                    active_str = container.module_controller.active_metadata.id
+                
+                module_map = {
+                    "core-ocr": 1,
+                    "core-color-analysis": 2,
+                    "core-ai-identify": 3,
+                    "core-object-detection": 4,
+                    "core-measurement": 5
+                }
+                active_numeric = module_map.get(active_str, 0)
+                
                 # Fetch StateStore counts
                 state = self.state_store.get_global_state()
+                status_numeric = state.get("latest_status", 0)
                 total = state.get("total_count", 0)
                 ok = state.get("ok_count", 0)
                 ng = state.get("ng_count", 0)
@@ -92,11 +108,13 @@ class HardwareManager:
                 
                 # Big-Endian mapping
                 values = [
-                    heartbeat,
-                    self.store.getValues(1, 1)[0], # Keep trigger intact if not 1
+                    active_numeric,
+                    status_numeric,
                     (total >> 16) & 0xFFFF, total & 0xFFFF,
                     (ok >> 16) & 0xFFFF, ok & 0xFFFF,
                     (ng >> 16) & 0xFFFF, ng & 0xFFFF,
+                    heartbeat,
+                    self.store.getValues(9, 1)[0], # Keep trigger intact if not 1
                     error_state
                 ]
                 
