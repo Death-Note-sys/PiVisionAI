@@ -2,39 +2,64 @@ import cv2
 import numpy as np
 import time
 import logging
+import threading
 from typing import Dict, Any, Optional
-from app.core.contracts import IModule
+from app.core.base_module import BaseModuleController
 from app.core.event_bus import EventBus
 from app.core.models.results import ColorResult
 from .settings import ColorAnalysisSettings
 
 logger = logging.getLogger(__name__)
 
-class ColorAnalysisController(IModule):
+class ColorAnalysisController(BaseModuleController):
     """Classical CV: K-means dominant color extraction, with an optional
     taught reference color compared via CIE Delta-E in LAB space (not raw
     RGB distance, which is not perceptually uniform)."""
 
     def __init__(self, event_bus: EventBus, settings: ColorAnalysisSettings):
-        self.event_bus = event_bus
+        super().__init__("core-color-analysis", event_bus)
         self.settings = settings
+        
+        # Load settings
+        saved_settings = self.load_settings()
+        if saved_settings:
+            self.settings.update(saved_settings)
+            
+        # Load teach data
+        saved_data = self.load_data()
+        if saved_data and saved_data.get("reference_status") == "Taught":
+            self.reference_status = "Taught"
+            self.reference_box = tuple(saved_data.get("reference_box", []))
+            rgb = saved_data.get("reference_rgb")
+            if rgb:
+                self.reference_rgb = tuple(rgb)
+                bgr = (rgb[2], rgb[1], rgb[0])
+                self.reference_lab = self._bgr_mean_to_lab(bgr)
+        else:
+            self.reference_status = "Untaught"
+            self.reference_lab = None
+            self.reference_rgb = None
+            self.reference_box = None
+            
         self.last_frame: Optional[np.ndarray] = None
         self.last_result: ColorResult = ColorResult()
-        self.reference_status = "Untaught"
-        self.reference_lab: Optional[np.ndarray] = None
-        self.reference_rgb: Optional[tuple] = None
+        self._lock = threading.Lock()
 
     def initialize(self) -> bool:
         logger.info("ColorAnalysisController initialized.")
         return True
 
     def configure(self, settings: Dict[str, Any]) -> bool:
-        return self.settings.update(settings)
+        if self.settings.update(settings):
+            self.save_settings(self.settings.get_settings())
+            return True
+        return False
 
     def on_raw_frame(self, frame) -> None:
         """Cheap hook, mirrors AI Identify's pattern, so teach_reference()
         always has a reasonably fresh frame even under trigger gating."""
-        self.last_frame = frame.copy()
+        with self._lock:
+            self.last_frame = frame.copy()
 
     def _safe_crop(self, frame: np.ndarray, x: int, y: int, w: int, h: int) -> Optional[np.ndarray]:
         fh, fw = frame.shape[:2]
@@ -45,26 +70,46 @@ class ColorAnalysisController(IModule):
             return None
         return frame[y:y+h, x:x+w].copy()
 
+    def _bgr_mean_to_lab(self, bgr_mean) -> np.ndarray:
+        px = (np.asarray(bgr_mean, np.float32) / 255.0).reshape(1, 1, 3)
+        return cv2.cvtColor(px, cv2.COLOR_BGR2LAB)[0, 0].astype(np.float64)
+
     def teach_reference(self, x: int, y: int, w: int, h: int) -> bool:
-        if self.last_frame is None:
-            logger.error("Cannot teach: no frame available yet.")
-            return False
-        crop = self._safe_crop(self.last_frame, x, y, w, h)
+        with self._lock:
+            if self.last_frame is None:
+                logger.error("Cannot teach: no frame available yet.")
+                return False
+            last_frame = self.last_frame.copy()
+
+        crop = self._safe_crop(last_frame, x, y, w, h)
         if crop is None:
             return False
         avg_bgr = crop.reshape(-1, 3).mean(axis=0)
-        avg_bgr_img = np.uint8([[avg_bgr]])
-        avg_lab = cv2.cvtColor(avg_bgr_img, cv2.COLOR_BGR2LAB)[0][0]
-        self.reference_lab = avg_lab.astype(np.float64)
-        self.reference_rgb = (int(avg_bgr[2]), int(avg_bgr[1]), int(avg_bgr[0]))  # BGR -> RGB
-        self.reference_status = "Taught"
+        with self._lock:
+            self.reference_lab = self._bgr_mean_to_lab(avg_bgr)
+            self.reference_rgb = (int(avg_bgr[2]), int(avg_bgr[1]), int(avg_bgr[0]))  # BGR -> RGB
+            self.reference_status = "Taught"
+            self.reference_box = (x, y, w, h)
+            
+        self.save_data({
+            "reference_status": "Taught",
+            "reference_box": self.reference_box,
+            "reference_rgb": self.reference_rgb
+        })
+        self.save_image("reference.png", crop)
+        
         self.event_bus.publish("ColorReferenceTaught", {"rgb": self.reference_rgb})
         return True
 
     def reset_reference(self) -> bool:
-        self.reference_lab = None
-        self.reference_rgb = None
-        self.reference_status = "Untaught"
+        with self._lock:
+            self.reference_lab = None
+            self.reference_rgb = None
+            self.reference_status = "Untaught"
+            self.reference_box = None
+            
+        self.save_data({"reference_status": "Untaught"})
+        
         self.event_bus.publish("ColorReferenceReset", {})
         return True
 
@@ -111,17 +156,26 @@ class ColorAnalysisController(IModule):
 
         delta_e = None
         match = None
-        if self.reference_status == "Taught" and dominant_colors:
-            top_rgb = dominant_colors[0]["rgb"]
-            top_bgr_img = np.uint8([[[top_rgb[2], top_rgb[1], top_rgb[0]]]])
-            top_lab = cv2.cvtColor(top_bgr_img, cv2.COLOR_BGR2LAB)[0][0].astype(np.float64)
-            delta_e = float(np.linalg.norm(top_lab - self.reference_lab))
-            match = delta_e <= delta_e_threshold
+        
+        with self._lock:
+            ref_status = self.reference_status
+            ref_box = self.reference_box
+            ref_lab = self.reference_lab
+            ref_rgb = self.reference_rgb
+            
+        if ref_status == "Taught" and ref_box is not None:
+            rx, ry, rw, rh = ref_box
+            live_crop = self._safe_crop(frame, rx, ry, rw, rh)
+            if live_crop is not None:
+                live_avg_bgr = live_crop.reshape(-1, 3).mean(axis=0)
+                live_avg_lab = self._bgr_mean_to_lab(live_avg_bgr)
+                delta_e = float(np.linalg.norm(live_avg_lab - ref_lab))
+                match = delta_e <= delta_e_threshold
 
         result = ColorResult(
             dominant_colors=dominant_colors,
-            reference_status=self.reference_status,
-            reference_color={"rgb": list(self.reference_rgb), "hex": self._rgb_to_hex(self.reference_rgb)} if self.reference_rgb else None,
+            reference_status=ref_status,
+            reference_color={"rgb": list(ref_rgb), "hex": self._rgb_to_hex(ref_rgb)} if ref_rgb else None,
             delta_e=round(delta_e, 2) if delta_e is not None else None,
             match=match,
             latency_ms=(time.perf_counter() - start) * 1000,

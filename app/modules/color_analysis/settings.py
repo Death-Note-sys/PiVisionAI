@@ -4,7 +4,7 @@ from pydantic import BaseModel
 
 class ColorAnalysisSettingsModel(BaseModel):
     num_colors: int = 5
-    delta_e_threshold: float = 10.0
+    delta_e_threshold: float = 25.0
     downsample_size: int = 100
     show_dominant_colors: bool = True
     show_reference_match: bool = True
