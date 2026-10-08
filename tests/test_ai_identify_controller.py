@@ -8,7 +8,8 @@ import cv2
 
 
 @pytest.fixture
-def controller():
+def controller(monkeypatch):
+    monkeypatch.setattr('app.core.container.Container.get_instance', lambda: None)
     event_bus = MagicMock()
     settings = AIIdentifySettings()
     return AIIdentifyController(event_bus, settings)

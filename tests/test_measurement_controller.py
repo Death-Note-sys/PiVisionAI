@@ -7,7 +7,8 @@ from app.core.models.results import MeasurementResult
 
 
 @pytest.fixture
-def controller():
+def controller(monkeypatch):
+    monkeypatch.setattr('app.core.container.Container.get_instance', lambda: None)
     event_bus = MagicMock()
     settings = MeasurementSettings()
     return MeasurementController(event_bus, settings)

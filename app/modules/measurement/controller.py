@@ -3,21 +3,30 @@ import math
 import time
 import logging
 from typing import Dict, Any, Optional
-from app.core.contracts import IModule
+from app.core.base_module import BaseModuleController
 from app.core.event_bus import EventBus
 from app.core.models.results import MeasurementResult
 from .settings import MeasurementSettings
 
 logger = logging.getLogger(__name__)
 
-class MeasurementController(IModule):
+class MeasurementController(BaseModuleController):
     """Classical CV dimension inspection. No AI runtime involved."""
 
     def __init__(self, event_bus: EventBus, settings: MeasurementSettings):
-        self.event_bus = event_bus
+        super().__init__("core-measurement", event_bus)
         self.settings = settings
-        self.pixels_per_cm: Optional[float] = None
-        self.calibration_status: str = "Uncalibrated"
+        
+        # Load settings
+        saved_settings = self.load_settings()
+        if saved_settings:
+            self.settings.update(saved_settings)
+            
+        # Load calibration data
+        saved_data = self.load_data()
+        self.pixels_per_cm = saved_data.get("pixels_per_cm")
+        self.calibration_status = "Calibrated" if self.pixels_per_cm else "Uncalibrated"
+        
         self.last_result: MeasurementResult = MeasurementResult()
 
     def initialize(self) -> bool:
@@ -25,7 +34,10 @@ class MeasurementController(IModule):
         return True
 
     def configure(self, settings: Dict[str, Any]) -> bool:
-        return self.settings.update(settings)
+        if self.settings.update(settings):
+            self.save_settings(self.settings.get_settings())
+            return True
+        return False
 
     def calibrate(self, x1: int, y1: int, x2: int, y2: int, real_length_cm: float) -> bool:
         """Set pixels-per-cm from two clicked points and a known real-world distance."""
@@ -35,6 +47,9 @@ class MeasurementController(IModule):
             return False
         self.pixels_per_cm = pixel_distance / real_length_cm
         self.calibration_status = "Calibrated"
+        
+        self.save_data({"pixels_per_cm": self.pixels_per_cm})
+        
         self.event_bus.publish("MeasurementCalibrated", {"pixels_per_cm": self.pixels_per_cm})
         logger.info(f"Measurement calibrated: {self.pixels_per_cm:.3f} px/cm")
         return True

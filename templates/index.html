@@ -860,11 +860,11 @@
 // ---------- Module-aware API layer ----------
 let activeModuleId = 'core-object-detection';
 const API_BASES = {
-  'core-object-detection': '/api/v1/object-detection',
-  'core-measurement': '/api/v1/measurement',
-  'core-ai-identify': '/api/v1/ai-identify',
-  'core-ocr': '/api/v1/ocr',
-  'core-color-analysis': '/api/v1/color-analysis',
+  'core-object-detection': '/api/v1/modules/active',
+  'core-measurement': '/api/v1/modules/active',
+  'core-ai-identify': '/api/v1/modules/active',
+  'core-ocr': '/api/v1/modules/active',
+  'core-color-analysis': '/api/v1/modules/active',
 };
 function apiBase() { return API_BASES[activeModuleId]; }
 

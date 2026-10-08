@@ -5,19 +5,19 @@ import logging
 import threading
 from typing import Dict, Any, Optional
 from skimage.metrics import structural_similarity as ssim
-from app.core.contracts import IModule
+from app.core.base_module import BaseModuleController
 from app.core.event_bus import EventBus
 from app.core.models.results import IdentifyResult
 from .settings import AIIdentifySettings
 
 logger = logging.getLogger(__name__)
 
-class AIIdentifyController(IModule):
+class AIIdentifyController(BaseModuleController):
     """Classical CV pose-invariant part identification and good/bad
     differentiation, taught from two reference images. No AI model."""
 
     def __init__(self, event_bus: EventBus, settings: AIIdentifySettings):
-        self.event_bus = event_bus
+        super().__init__("core-ai-identify", event_bus)
         self.settings = settings
         self.last_frame: Optional[np.ndarray] = None
         self.last_result: IdentifyResult = IdentifyResult()
@@ -30,13 +30,40 @@ class AIIdentifyController(IModule):
 
         self.orb = cv2.ORB_create(nfeatures=1000)
         self.matcher = cv2.BFMatcher(cv2.NORM_HAMMING)
+        
+        # Load settings
+        saved_settings = self.load_settings()
+        if saved_settings:
+            self.settings.update(saved_settings)
+            
+        # Load teach data
+        saved_data = self.load_data()
+        if saved_data:
+            num_good = saved_data.get("good_count", 0)
+            num_bad = saved_data.get("bad_count", 0)
+            for i in range(num_good):
+                img = self.load_image(f"good_{i}.png")
+                if img is not None:
+                    kp, des = self.orb.detectAndCompute(cv2.cvtColor(img, cv2.COLOR_BGR2GRAY), None)
+                    if des is not None:
+                        self.good_references.append({"image": img, "keypoints": kp, "descriptors": des})
+            for i in range(num_bad):
+                img = self.load_image(f"bad_{i}.png")
+                if img is not None:
+                    kp, des = self.orb.detectAndCompute(cv2.cvtColor(img, cv2.COLOR_BGR2GRAY), None)
+                    if des is not None:
+                        self.bad_references.append({"image": img, "keypoints": kp, "descriptors": des})
+            self._update_teach_status()
 
     def initialize(self) -> bool:
         logger.info("AIIdentifyController initialized.")
         return True
 
     def configure(self, settings: Dict[str, Any]) -> bool:
-        return self.settings.update(settings)
+        if self.settings.update(settings):
+            self.save_settings(self.settings.get_settings())
+            return True
+        return False
 
     def _safe_crop(self, frame: np.ndarray, x: int, y: int, w: int, h: int) -> Optional[np.ndarray]:
         fh, fw = frame.shape[:2]
@@ -78,6 +105,12 @@ class AIIdentifyController(IModule):
             self.good_references.append({"image": crop, "keypoints": kp, "descriptors": des})
             self._update_teach_status()
             count = len(self.good_references)
+            
+        self.save_image(f"good_{count-1}.png", crop)
+        self.save_data({
+            "good_count": len(self.good_references),
+            "bad_count": len(self.bad_references)
+        })
         self.event_bus.publish("AIIdentifyTaughtGood", {"count": count})
         return True
 
@@ -102,6 +135,12 @@ class AIIdentifyController(IModule):
             self.bad_references.append({"image": crop, "keypoints": kp, "descriptors": des})
             self._update_teach_status()
             count = len(self.bad_references)
+            
+        self.save_image(f"bad_{count-1}.png", crop)
+        self.save_data({
+            "good_count": len(self.good_references),
+            "bad_count": len(self.bad_references)
+        })
         self.event_bus.publish("AIIdentifyTaughtBad", {"count": count})
         return True
 
@@ -113,6 +152,22 @@ class AIIdentifyController(IModule):
             del self.good_references[index]
             self._update_teach_status()
             remaining = len(self.good_references)
+            
+        import os
+        if self.module_dir:
+            for i in range(index, remaining):
+                src = os.path.join(self.module_dir, f"good_{i+1}.png")
+                dst = os.path.join(self.module_dir, f"good_{i}.png")
+                if os.path.exists(src):
+                    os.replace(src, dst)
+            last = os.path.join(self.module_dir, f"good_{remaining}.png")
+            if os.path.exists(last):
+                os.remove(last)
+            
+        self.save_data({
+            "good_count": remaining,
+            "bad_count": len(self.bad_references)
+        })
         self.event_bus.publish("AIIdentifyRemovedGood", {"index": index, "remaining": remaining})
         return True
 
@@ -124,6 +179,22 @@ class AIIdentifyController(IModule):
             del self.bad_references[index]
             self._update_teach_status()
             remaining = len(self.bad_references)
+            
+        import os
+        if self.module_dir:
+            for i in range(index, remaining):
+                src = os.path.join(self.module_dir, f"bad_{i+1}.png")
+                dst = os.path.join(self.module_dir, f"bad_{i}.png")
+                if os.path.exists(src):
+                    os.replace(src, dst)
+            last = os.path.join(self.module_dir, f"bad_{remaining}.png")
+            if os.path.exists(last):
+                os.remove(last)
+            
+        self.save_data({
+            "good_count": len(self.good_references),
+            "bad_count": remaining
+        })
         self.event_bus.publish("AIIdentifyRemovedBad", {"index": index, "remaining": remaining})
         return True
 
@@ -132,6 +203,14 @@ class AIIdentifyController(IModule):
             self.good_references = []
             self.bad_references = []
             self.teach_status = "Untaught"
+            
+        import glob, os
+        if self.module_dir:
+            for f in glob.glob(os.path.join(self.module_dir, "good_*.png")) + glob.glob(os.path.join(self.module_dir, "bad_*.png")):
+                try: os.remove(f)
+                except: pass
+        self.save_data({"good_count": 0, "bad_count": 0})
+        
         self.event_bus.publish("AIIdentifyReset", {})
         return True
 

@@ -7,7 +7,8 @@ from app.core.models.results import ColorResult
 
 
 @pytest.fixture
-def controller():
+def controller(monkeypatch):
+    monkeypatch.setattr('app.core.container.Container.get_instance', lambda: None)
     event_bus = MagicMock()
     settings = ColorAnalysisSettings()
     return ColorAnalysisController(event_bus, settings)

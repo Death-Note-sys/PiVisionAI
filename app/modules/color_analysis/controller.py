@@ -4,27 +4,45 @@ import time
 import logging
 import threading
 from typing import Dict, Any, Optional
-from app.core.contracts import IModule
+from app.core.base_module import BaseModuleController
 from app.core.event_bus import EventBus
 from app.core.models.results import ColorResult
 from .settings import ColorAnalysisSettings
 
 logger = logging.getLogger(__name__)
 
-class ColorAnalysisController(IModule):
+class ColorAnalysisController(BaseModuleController):
     """Classical CV: K-means dominant color extraction, with an optional
     taught reference color compared via CIE Delta-E in LAB space (not raw
     RGB distance, which is not perceptually uniform)."""
 
     def __init__(self, event_bus: EventBus, settings: ColorAnalysisSettings):
-        self.event_bus = event_bus
+        super().__init__("core-color-analysis", event_bus)
         self.settings = settings
+        
+        # Load settings
+        saved_settings = self.load_settings()
+        if saved_settings:
+            self.settings.update(saved_settings)
+            
+        # Load teach data
+        saved_data = self.load_data()
+        if saved_data and saved_data.get("reference_status") == "Taught":
+            self.reference_status = "Taught"
+            self.reference_box = tuple(saved_data.get("reference_box", []))
+            rgb = saved_data.get("reference_rgb")
+            if rgb:
+                self.reference_rgb = tuple(rgb)
+                bgr = (rgb[2], rgb[1], rgb[0])
+                self.reference_lab = self._bgr_mean_to_lab(bgr)
+        else:
+            self.reference_status = "Untaught"
+            self.reference_lab = None
+            self.reference_rgb = None
+            self.reference_box = None
+            
         self.last_frame: Optional[np.ndarray] = None
         self.last_result: ColorResult = ColorResult()
-        self.reference_status = "Untaught"
-        self.reference_lab: Optional[np.ndarray] = None
-        self.reference_rgb: Optional[tuple] = None
-        self.reference_box: Optional[tuple] = None  # (x, y, w, h)
         self._lock = threading.Lock()
 
     def initialize(self) -> bool:
@@ -32,7 +50,10 @@ class ColorAnalysisController(IModule):
         return True
 
     def configure(self, settings: Dict[str, Any]) -> bool:
-        return self.settings.update(settings)
+        if self.settings.update(settings):
+            self.save_settings(self.settings.get_settings())
+            return True
+        return False
 
     def on_raw_frame(self, frame) -> None:
         """Cheap hook, mirrors AI Identify's pattern, so teach_reference()
@@ -70,6 +91,13 @@ class ColorAnalysisController(IModule):
             self.reference_status = "Taught"
             self.reference_box = (x, y, w, h)
             
+        self.save_data({
+            "reference_status": "Taught",
+            "reference_box": self.reference_box,
+            "reference_rgb": self.reference_rgb
+        })
+        self.save_image("reference.png", crop)
+        
         self.event_bus.publish("ColorReferenceTaught", {"rgb": self.reference_rgb})
         return True
 
@@ -80,6 +108,8 @@ class ColorAnalysisController(IModule):
             self.reference_status = "Untaught"
             self.reference_box = None
             
+        self.save_data({"reference_status": "Untaught"})
+        
         self.event_bus.publish("ColorReferenceReset", {})
         return True
 
