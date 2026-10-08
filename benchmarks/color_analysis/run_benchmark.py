@@ -93,6 +93,16 @@ def dominant_color_str(colors):
     top = colors[0]
     return f"rgb({top['rgb'][0]:3d},{top['rgb'][1]:3d},{top['rgb'][2]:3d}) {top['hex']}  {top['percentage']:.0f}%"
 
+def calc_old_delta_e(ref_img, rx, ry, rw, rh, probe_img):
+    ref_crop = ref_img[ry:ry+rh, rx:rx+rw]
+    ref_avg = ref_crop.reshape(-1, 3).mean(axis=0)
+    ref_lab = cv2.cvtColor(np.uint8([[ref_avg]]), cv2.COLOR_BGR2LAB)[0][0].astype(np.float64)
+    
+    probe_crop = probe_img[ry:ry+rh, rx:rx+rw]
+    probe_avg = probe_crop.reshape(-1, 3).mean(axis=0)
+    probe_lab = cv2.cvtColor(np.uint8([[probe_avg]]), cv2.COLOR_BGR2LAB)[0][0].astype(np.float64)
+    return float(np.linalg.norm(probe_lab - ref_lab))
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -124,7 +134,7 @@ def run():
     print()
 
     # Column header
-    hdr = f"{'Probe':<50} {'Rel':<7} {'DeltaE':>7}  {'Dominant color'}"
+    hdr = f"{'Probe':<50} {'Rel':<7} {'Old DE':>7} {'New DE':>7}  {'Dominant color'}"
     print(hdr)
     print("-" * 90)
 
@@ -138,9 +148,16 @@ def run():
 
         result = ctrl.process({"frame": img})
         de = result.delta_e
+        
+        try:
+            old_de = calc_old_delta_e(ref_img, x, y, w, h, img)
+            old_de_str = f"{old_de:7.2f}"
+        except:
+            old_de_str = "    N/A"
+            
         dom = dominant_color_str(result.dominant_colors)
         de_str = f"{de:7.2f}" if de is not None else "    N/A"
-        print(f"{label:<50} {rel:<7} {de_str}  {dom}")
+        print(f"{label:<50} {rel:<7} {old_de_str} {de_str}  {dom}")
         if de is not None:
             results[rel].append((label, de))
 

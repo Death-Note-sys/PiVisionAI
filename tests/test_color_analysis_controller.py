@@ -115,3 +115,17 @@ def test_process_reports_multiple_colors_in_two_tone_frame(controller):
     assert len(result.dominant_colors) >= 2
     total_pct = sum(c["percentage"] for c in result.dominant_colors)
     assert 90 <= total_pct <= 100
+
+def test_true_cie_lab_delta_e_math(controller):
+    img1 = make_solid_color_frame((130, 130, 130))
+    img2 = make_solid_color_frame((118, 118, 118))
+    
+    controller.on_raw_frame(img1)
+    controller.teach_reference(0, 0, 200, 200)
+    
+    result = controller.process({"frame": img2})
+    
+    assert result.delta_e is not None
+    # True CIE LAB difference is ~4.91.
+    # Old uint8-based OpenCV math inflated this to 126.0.
+    assert 4.0 <= result.delta_e <= 6.0

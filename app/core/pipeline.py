@@ -45,9 +45,9 @@ class Pipeline:
         """Set the active computer vision module."""
         self.active_module = module
         with self._trigger_lock:
-            self.trigger_mode = "continuous"
             self._pending_trigger = False
             self._last_trigger_time = 0.0
+            self._frozen_output_frame = None
         logger.info(f"Pipeline active module set.")
 
     def set_trigger_mode(self, mode: str) -> bool:

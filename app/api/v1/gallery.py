@@ -10,10 +10,9 @@ def get_gallery_files():
     config = container.config
     
     files = []
-    # Directories to scan based on the new architecture paths
-    session_dir = config.get("session_dir", os.path.join(os.getcwd(), "sessions", "default"))
-    captures_dir = os.path.join(session_dir, "captures")
-    exports_dir = os.path.join(session_dir, "exports")
+    data_dir = config.get("data_dir", os.path.join(os.getcwd(), "data"))
+    captures_dir = os.path.join(data_dir, "ng_images")
+    exports_dir = os.path.join(data_dir, "exports")
     
     dirs = [
         (captures_dir, 'image', ['.png', '.jpg', '.jpeg', '.webp']),
@@ -48,12 +47,12 @@ def download_gallery_file():
         
     container = Container.get_instance()
     config = container.config
-    session_dir = config.get("session_dir", os.path.join(os.getcwd(), "sessions", "default"))
+    data_dir = config.get("data_dir", os.path.join(os.getcwd(), "data"))
     
     if cat in ['image', 'video']:
-        d = os.path.join(session_dir, "captures")
+        d = os.path.join(data_dir, "ng_images")
     elif cat == 'document':
-        d = os.path.join(session_dir, "exports")
+        d = os.path.join(data_dir, "exports")
     else:
         return "Invalid category", 400
     
@@ -72,12 +71,12 @@ def delete_gallery_file():
         
     container = Container.get_instance()
     config = container.config
-    session_dir = config.get("session_dir", os.path.join(os.getcwd(), "sessions", "default"))
+    data_dir = config.get("data_dir", os.path.join(os.getcwd(), "data"))
     
     if cat in ['image', 'video']:
-        d = os.path.join(session_dir, "captures")
+        d = os.path.join(data_dir, "ng_images")
     elif cat == 'document':
-        d = os.path.join(session_dir, "exports")
+        d = os.path.join(data_dir, "exports")
     else:
         return jsonify({'error': 'Invalid category'}), 400
     
