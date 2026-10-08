@@ -10,12 +10,13 @@ logger = logging.getLogger(__name__)
 class ModuleController:
     """Manages the active module lifecycle and hooks it into the Pipeline."""
     
-    def __init__(self, plugin_manager: PluginManager, pipeline: Pipeline, event_bus: EventBus, ai_runtime: Any = None, model_registry: Any = None):
+    def __init__(self, plugin_manager: PluginManager, pipeline: Pipeline, event_bus: EventBus, ai_runtime: Any = None, model_registry: Any = None, state_store: Any = None):
         self.plugin_manager = plugin_manager
         self.pipeline = pipeline
         self.event_bus = event_bus
         self.ai_runtime = ai_runtime
         self.model_registry = model_registry
+        self.state_store = state_store
         
         self.active_module_instance: Optional[Any] = None
         self.active_service_instance: Optional[Any] = None

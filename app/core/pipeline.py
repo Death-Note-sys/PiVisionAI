@@ -45,9 +45,9 @@ class Pipeline:
         """Set the active computer vision module."""
         self.active_module = module
         with self._trigger_lock:
-            self.trigger_mode = "continuous"
             self._pending_trigger = False
             self._last_trigger_time = 0.0
+            self._frozen_output_frame = None
         logger.info(f"Pipeline active module set.")
 
     def set_trigger_mode(self, mode: str) -> bool:
@@ -169,7 +169,13 @@ class Pipeline:
                 with self._trigger_lock:
                     self._frozen_output_frame = rendered_frame.copy() if hasattr(rendered_frame, "copy") else rendered_frame
 
-            self.event_bus.publish("FrameProcessed", context["metrics"])
+            payload = {
+                "metrics": context["metrics"],
+                "result": result,
+                "frame": context["original_frame"],
+                "module_id": getattr(self.active_module, "id", "unknown")
+            }
+            self.event_bus.publish("FrameProcessed", payload)
 
         except Exception as e:
             logger.error(f"Pipeline error during frame processing: {e}", exc_info=True)

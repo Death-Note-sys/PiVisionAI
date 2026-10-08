@@ -19,8 +19,8 @@ class SessionManager:
         self.session_id = str(uuid.uuid4())
         self.start_time = datetime.now()
         
-        self.base_dir = self.config.get("data_dir", "sessions")
-        self.session_dir = os.path.join(self.base_dir, self.session_id)
+        self.base_dir = self.config.get("data_dir", "data")
+        self.session_dir = self.base_dir
         
         self.metadata = SessionMetadata(
             session_id=self.session_id,
@@ -32,7 +32,7 @@ class SessionManager:
 
     def _initialize_workspace(self):
         """Create directory structure for the current session."""
-        dirs = ['captures', 'recordings', 'exports', 'logs']
+        dirs = ['ng_images', 'recordings', 'exports', 'logs']
         for d in dirs:
             os.makedirs(os.path.join(self.session_dir, d), exist_ok=True)
             
@@ -54,10 +54,14 @@ class SessionManager:
         self._save_metadata()
         logger.info(f"Session {self.session_id} saved and closed.")
 
-    def get_session_dir(self, subfolder: Optional[str] = None) -> str:
-        """Get the absolute path to the session directory or a specific subfolder."""
+    def get_data_dir(self, subfolder: Optional[str] = None) -> str:
+        """Get the absolute path to the data directory or a specific subfolder."""
         if subfolder:
-            path = os.path.join(self.session_dir, subfolder)
+            path = os.path.join(self.base_dir, subfolder)
             os.makedirs(path, exist_ok=True)
             return path
-        return self.session_dir
+        return self.base_dir
+
+    def get_session_dir(self, subfolder: Optional[str] = None) -> str:
+        """Alias for get_data_dir for backward compatibility."""
+        return self.get_data_dir(subfolder)

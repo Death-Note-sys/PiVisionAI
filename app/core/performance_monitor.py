@@ -37,13 +37,15 @@ class PerformanceMonitor:
             if elapsed > 0:
                 self.metrics.fps = round(len(self._frame_times) / elapsed, 2)
                 
+        metrics = payload.get("metrics", payload)
+        
         # Update latencies if provided in payload
-        if "inference_ms" in payload:
-            self._inference_latencies.append(payload["inference_ms"])
+        if "inference_ms" in metrics:
+            self._inference_latencies.append(metrics["inference_ms"])
             self.metrics.inference_latency_ms = sum(self._inference_latencies) / len(self._inference_latencies)
             
-        if "e2e_ms" in payload:
-            self._e2e_latencies.append(payload["e2e_ms"])
+        if "e2e_ms" in metrics:
+            self._e2e_latencies.append(metrics["e2e_ms"])
             self.metrics.e2e_latency_ms = sum(self._e2e_latencies) / len(self._e2e_latencies)
 
     def update_system_metrics(self):

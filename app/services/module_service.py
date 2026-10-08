@@ -30,3 +30,23 @@ class ModuleService:
     def update_module_settings(self, settings: Dict[str, Any]) -> bool:
         """Update settings of the active module."""
         return self.module_controller.update_settings(settings)
+        
+    def start_active(self) -> bool:
+        service = self.module_controller.get_active_service()
+        return service.start() if service and hasattr(service, 'start') else False
+
+    def stop_active(self) -> bool:
+        service = self.module_controller.get_active_service()
+        return service.stop() if service and hasattr(service, 'stop') else False
+
+    def get_active_status(self) -> Optional[Dict[str, Any]]:
+        service = self.module_controller.get_active_service()
+        return service.get_status() if service and hasattr(service, 'get_status') else None
+        
+    def invoke_active_method(self, method_name: str, **kwargs) -> Any:
+        service = self.module_controller.get_active_service()
+        if service and hasattr(service, method_name):
+            method = getattr(service, method_name)
+            if callable(method):
+                return method(**kwargs)
+        raise ValueError(f"Active module does not support '{method_name}'")

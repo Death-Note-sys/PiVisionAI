@@ -133,3 +133,7 @@ def stream():
         output_manager.get_mjpeg_generator(target_fps=30),
         mimetype='multipart/x-mixed-replace; boundary=frame'
     )
+
+@bp.route('/references/<kind>/<int:index>', methods=['GET'])
+def get_reference_image(kind, index):
+    return jsonify({"error": "Not implemented"}), 404
