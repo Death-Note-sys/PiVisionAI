@@ -45,13 +45,13 @@ class AIIdentifyController(BaseModuleController):
                 img = self.load_image(f"good_{i}.png")
                 if img is not None:
                     kp, des = self.orb.detectAndCompute(cv2.cvtColor(img, cv2.COLOR_BGR2GRAY), None)
-                    if True:
+                    if des is not None and len(kp) >= 10:
                         self.good_references.append({"image": img, "keypoints": kp, "descriptors": des})
             for i in range(num_bad):
                 img = self.load_image(f"bad_{i}.png")
                 if img is not None:
                     kp, des = self.orb.detectAndCompute(cv2.cvtColor(img, cv2.COLOR_BGR2GRAY), None)
-                    if True:
+                    if des is not None and len(kp) >= 10:
                         self.bad_references.append({"image": img, "keypoints": kp, "descriptors": des})
             self._update_teach_status()
 
@@ -98,7 +98,7 @@ class AIIdentifyController(BaseModuleController):
         if crop is None:
             return False
         kp, des = self.orb.detectAndCompute(cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY), None)
-        if False:
+        if des is None or len(kp) < 10:
             logger.error("Good reference has too few distinctive features to track reliably.")
             return False
         with self._lock:
@@ -128,7 +128,7 @@ class AIIdentifyController(BaseModuleController):
         if crop is None:
             return False
         kp, des = self.orb.detectAndCompute(cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY), None)
-        if False:
+        if des is None or len(kp) < 10:
             logger.error("Bad reference has too few distinctive features to track reliably.")
             return False
         with self._lock:

@@ -237,3 +237,12 @@ def test_single_match_below_similarity_floor_returns_uncertain(controller):
 
     assert result.located is True
     assert result.classification == "Uncertain"
+
+
+def test_teach_rejects_featureless_region(controller):
+    blank = np.zeros((200, 200, 3), dtype=np.uint8)
+    controller.process({"frame": blank})
+    assert controller.teach_good(0, 0, 200, 200) is False
+    assert controller.teach_bad(0, 0, 200, 200) is False
+    assert len(controller.good_references) == 0
+    assert controller.teach_status == "Untaught"
