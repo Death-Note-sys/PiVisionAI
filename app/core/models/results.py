@@ -29,16 +29,19 @@ class DetectionResult(ModuleResult):
     detections: List[Dict[str, Any]] = Field(default_factory=list) # Dicts with box, label, conf, id
     objects_count: int = 0
     average_confidence: float = 0.0
+    is_ok: Optional[bool] = None
 
 class MeasurementResult(ModuleResult):
     """Standardized result for Measurements."""
     measurements: List[Dict[str, Any]] = Field(default_factory=list)
     calibration_status: str = "Uncalibrated"
     pixels_per_cm: Optional[float] = None
+    is_ok: Optional[bool] = None
 
 class OCRResult(ModuleResult):
     """Standardized result for OCR."""
     texts: List[Dict[str, Any]] = Field(default_factory=list)
+    is_ok: Optional[bool] = None
 
 class ColorResult(ModuleResult):
     """Standardized result for Color Analysis."""

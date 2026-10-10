@@ -100,6 +100,27 @@ class MeasurementController(BaseModuleController):
 
             measurements.append(entry)
 
+        is_ok = None
+        target = settings.get("target_width_mm", 0.0)
+        tol = settings.get("tolerance_mm", 0.0)
+        roi = settings.get("judgment_roi", {})
+        
+        if self.pixels_per_mm and target > 0 and tol >= 0:
+            is_ok = False
+            for m in measurements:
+                x, y, w, h = m["bbox"]["x"], m["bbox"]["y"], m["bbox"]["w"], m["bbox"]["h"]
+                cx, cy = x + w/2, y + h/2
+                if roi and roi.get("w", 0) > 0 and roi.get("h", 0) > 0:
+                    if not (roi["x"] <= cx <= roi["x"]+roi["w"] and roi["y"] <= cy <= roi["y"]+roi["h"]):
+                        continue
+                
+                width_mm = m["width_mm"]
+                height_mm = m["height_mm"]
+                if width_mm and height_mm:
+                    if abs(width_mm - target) <= tol or abs(height_mm - target) <= tol:
+                        is_ok = True
+                        break
+
         latency_ms = (time.perf_counter() - start) * 1000
 
         result = MeasurementResult(
@@ -108,6 +129,7 @@ class MeasurementController(BaseModuleController):
             pixels_per_mm=self.pixels_per_mm,
             latency_ms=latency_ms,
             timestamp=time.time(),
+            is_ok=is_ok
         )
         self.last_result = result
         return result

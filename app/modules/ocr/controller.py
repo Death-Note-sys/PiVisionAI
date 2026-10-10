@@ -42,9 +42,6 @@ class OCRController(BaseModuleController):
         min_confidence = settings.get("min_confidence", 0.3)
         canvas_size = settings.get("canvas_size", 960)
         expected_pattern = settings.get("expected_pattern", "")
-        # Use re.fullmatch if expected_pattern is set
-        if expected_pattern: re.fullmatch(expected_pattern, "test")
-
         try:
             adapter_result = self.ai_runtime.predict(
                 self.active_model_id, {"frame": frame, "min_confidence": min_confidence, "canvas_size": canvas_size}
@@ -55,13 +52,27 @@ class OCRController(BaseModuleController):
 
         if not adapter_result:
             return OCRResult()
-
         result = OCRResult(
             texts=adapter_result.get("texts", []),
             latency_ms=adapter_result.get("latency_ms", 0.0),
             model_name=self.active_model_id,
             timestamp=time.time(),
         )
+        
+        is_ok = None
+        if expected_pattern:
+            is_ok = False
+            try:
+                regex = re.compile(expected_pattern)
+                for txt in result.texts:
+                    if regex.fullmatch(txt["text"]):
+                        is_ok = True
+                        break
+            except re.error as e:
+                logger.error(f"Invalid regex '{expected_pattern}': {e}")
+                is_ok = False
+        result.is_ok = is_ok
+        
         self.last_result = result
 
         if len(result.texts) > 0:

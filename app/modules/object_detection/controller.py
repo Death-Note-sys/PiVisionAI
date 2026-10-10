@@ -43,6 +43,7 @@ class ObjectDetectionController(BaseModuleController):
         # Get settings
         conf = self.settings.get_settings().get("confidence", 0.5)
         count_min = self.settings.get_settings().get("count_min", 0)
+        count_max = self.settings.get_settings().get("count_max", 0)
         
         # Request inference from AI Runtime Adapter
         try:
@@ -60,8 +61,13 @@ class ObjectDetectionController(BaseModuleController):
             latency_ms=adapter_result.get("latency_ms", 0.0),
             objects_count=len(adapter_result.get("detections", [])),
             model_name=self.active_model_id,
-            timestamp=time.time()
         )
+        
+        is_ok = None
+        if count_min > 0 or count_max > 0:
+            if count_max == 0: count_max = 999999
+            is_ok = (count_min <= result.objects_count <= count_max)
+            result.is_ok = is_ok
         
         if result.objects_count > 0:
             self.event_bus.publish("ObjectsDetected", {"count": result.objects_count, "model": result.model_name})

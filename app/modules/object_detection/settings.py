@@ -9,6 +9,8 @@ class ODSettingsModel(BaseModel):
     show_conf: bool = True
     thickness: int = 2
     model_id: str = "yolo11n"
+    count_min: int = 0
+    count_max: int = 0
 
 class ObjectDetectionSettings(ISettingsProvider):
     def __init__(self):
