@@ -125,10 +125,62 @@ def test_per_module_persistence_round_trip(tmp_path):
 
 # 6. camera backend fallback and read-back
 def test_camera_backend_fallback(monkeypatch):
-    monkeypatch.setenv("PI_VISION_CAMERA_BACKEND", "v4l2")
-    service = ConfigService()
-    assert service.get("camera_backend") == "v4l2"
+    import cv2
+    from unittest.mock import MagicMock
+    from app.core.camera_manager import CameraManager
+    from app.core.config_service import ConfigService
+
+    monkeypatch.setattr('os.name', 'nt')
+    mock_config = MagicMock(spec=ConfigService)
+    mock_config.get.side_effect = lambda k, d=None: "auto" if k == "camera_backend" else ("1280x720" if k == "camera_resolution" else d)
+
+    mock_event_bus = MagicMock()
+    mock_pipeline = MagicMock()
+    mock_monitor = MagicMock()
+
+    mock_cap = MagicMock()
     
-    monkeypatch.delenv("PI_VISION_CAMERA_BACKEND", raising=False)
-    service2 = ConfigService()
-    assert service2.get("camera_backend", "opencv") in ("opencv", "auto")
+    # Track which backend was called
+    calls = []
+    
+    def mock_video_capture(index, backend):
+        calls.append(backend)
+        # Fail first two, succeed on ANY
+        mock_cap.isOpened.return_value = (backend == cv2.CAP_ANY)
+        return mock_cap
+
+    monkeypatch.setattr(cv2, "VideoCapture", mock_video_capture)
+
+    # Need to prevent the threads from actually starting and blocking
+    monkeypatch.setattr("threading.Thread.start", MagicMock())
+    
+    manager = CameraManager(mock_config, mock_event_bus, mock_pipeline, mock_monitor)
+    manager._open_camera()
+
+    assert calls == [cv2.CAP_DSHOW, cv2.CAP_MSMF, cv2.CAP_ANY]
+    assert manager.is_connected is True
+
+    # Mock getter for readback
+    def mock_get(propId):
+        return {
+            cv2.CAP_PROP_EXPOSURE: -6.0,
+            cv2.CAP_PROP_GAIN: 150.0,
+            cv2.CAP_PROP_AUTO_EXPOSURE: 1.0,
+            cv2.CAP_PROP_AUTO_WB: 0.0,
+            cv2.CAP_PROP_WB_TEMPERATURE: 5000.0
+        }.get(propId, 0.0)
+    mock_cap.get.side_effect = mock_get
+
+    readback = manager.apply_settings({
+        "exposure": -6.0,
+        "gain": 150,
+        "auto_exposure": False,
+        "auto_wb": False,
+        "wb_temperature": 5000
+    })
+
+    assert readback["exposure"] == -6.0
+    assert readback["gain"] == 150.0
+    assert readback["auto_exposure"] is True
+    assert readback["auto_wb"] is False
+    assert readback["wb_temperature"] == 5000.0
