@@ -24,3 +24,9 @@ scratch/
 # IDE
 .vscode/
 .idea/
+
+boot.log
+audit.txt
+scratch/
+data/
+*.log
