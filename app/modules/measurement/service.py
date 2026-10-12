@@ -35,6 +35,8 @@ class MeasurementService(IService):
         return True
 
     def update_settings(self, new_settings: Dict[str, Any]) -> bool:
+        if self.module_ref and hasattr(self.module_ref, "configure"):
+            return self.module_ref.configure(new_settings)
         return self.settings.update(new_settings)
 
     def calibrate(self, x1: int, y1: int, x2: int, y2: int, real_length_cm: float) -> bool:

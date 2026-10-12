@@ -31,6 +31,8 @@ class ColorAnalysisService(IService):
         return True
 
     def update_settings(self, new_settings: Dict[str, Any]) -> bool:
+        if self.module_ref and hasattr(self.module_ref, "configure"):
+            return self.module_ref.configure(new_settings)
         return self.settings.update(new_settings)
 
     def teach_reference(self, x: int, y: int, w: int, h: int) -> bool:
