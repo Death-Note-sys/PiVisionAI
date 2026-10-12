@@ -124,3 +124,7 @@ class HardwareManager:
                 logger.error(f"Modbus sync loop error: {e}")
                 
             time.sleep(0.1) # 100ms poll
+
+    def stop(self):
+        """Stop modbus synchronization loop."""
+        self._running = False

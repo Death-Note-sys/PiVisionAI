@@ -78,13 +78,14 @@ def test_object_detection_count_boundaries():
     ai_runtime.predict.return_value = {"detections": [{"id":1}, {"id":2}, {"id":3}], "latency_ms": 1.0}
     
     settings = ObjectDetectionSettings()
-    settings.update({"count_min": 2, "count_max": 4})
+    
     controller = ObjectDetectionController(event_bus, ai_runtime, settings)
+    controller.configure({"count_min": 2, "count_max": 4})
     
     res = controller.process({"frame": np.zeros((10,10,3))})
     assert res.is_ok is True
     
-    settings.update({"count_min": 4, "count_max": 5})
+    controller.configure({"count_min": 4, "count_max": 5})
     res2 = controller.process({"frame": np.zeros((10,10,3))})
     assert res2.is_ok is False
 
@@ -94,8 +95,8 @@ def test_ocr_regex_boundaries():
     ai_runtime = MagicMock()
     
     settings = OCRSettings()
-    settings.update({"expected_pattern": "^PASS-\\d{3}$"})
     controller = OCRController(event_bus, ai_runtime, settings)
+    controller.configure({"expected_pattern": "^PASS-\\d{3}$"})
     
     # Match
     ai_runtime.predict.return_value = {"texts": [{"text": "PASS-123"}], "latency_ms": 1.0}
@@ -108,7 +109,7 @@ def test_ocr_regex_boundaries():
     assert res2.is_ok is False
     
     # Invalid regex
-    settings.update({"expected_pattern": "["})
+    controller.configure({"expected_pattern": "["})
     ai_runtime.predict.return_value = {"texts": [{"text": "OK"}], "latency_ms": 1.0}
     res3 = controller.process({"frame": np.zeros((10,10,3))})
     assert res3.is_ok is False
@@ -123,13 +124,20 @@ def test_per_module_persistence_round_trip(tmp_path):
     val = store2.get("core-ai-identify")
     assert val == {"some_key": "value123"}
 
-# 6. camera backend fallback and read-back
-def test_camera_backend_fallback(monkeypatch):
+# 6. config service env var precedence
+def test_config_service_env_precedence(monkeypatch, isolate_data_dir):
+    monkeypatch.setenv("PI_VISION_CAMERA_BACKEND", "v4l2")
+    from app.core.config_service import ConfigService
+    service = ConfigService()
+    assert service.get("camera_backend") == "v4l2"
+
+# 7. camera backend fallback and read-back
+def test_camera_backend_fallback(monkeypatch, isolate_data_dir):
     import cv2
     from unittest.mock import MagicMock
     from app.core.camera_manager import CameraManager
     from app.core.config_service import ConfigService
-
+    
     monkeypatch.setattr('os.name', 'nt')
     mock_config = MagicMock(spec=ConfigService)
     mock_config.get.side_effect = lambda k, d=None: "auto" if k == "camera_backend" else ("1280x720" if k == "camera_resolution" else d)

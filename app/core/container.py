@@ -90,4 +90,5 @@ class Container:
         if hasattr(self, 'camera_manager'): self.camera_manager.stop()
         if hasattr(self, 'ai_runtime'): self.ai_runtime.shutdown()
         if hasattr(self, 'resource_manager'): self.resource_manager.shutdown()
+        if hasattr(self, 'hardware_manager'): self.hardware_manager.stop()
         logger.info("Shutdown complete.")
