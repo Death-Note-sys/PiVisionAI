@@ -12,6 +12,20 @@ from unittest.mock import MagicMock
 
 import cv2
 
+import tempfile
+import atexit
+import shutil
+
+# Hermetic isolation: use temporary data directory so benchmark never touches real data/modules
+_BENCH_DATA_DIR = tempfile.mkdtemp(prefix="pivision_bench_data_")
+os.environ["PI_VISION_DATA_DIR"] = _BENCH_DATA_DIR
+os.environ["PI_VISION_MODBUS_ENABLED"] = "false"
+
+def _cleanup_bench():
+    shutil.rmtree(_BENCH_DATA_DIR, ignore_errors=True)
+
+atexit.register(_cleanup_bench)
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 from app.modules.ai_identify.controller import AIIdentifyController
@@ -25,9 +39,7 @@ MANIFEST_PATH = os.path.join(BENCH_DIR, "probes_manifest.json")
 REFERENCES_MANIFEST_PATH = os.path.join(BENCH_DIR, "references_manifest.json")
 
 SETTINGS_OVERRIDE = {
-    # "classification_margin": 0.03,
-    # "match_ratio_threshold": 0.8,
-    # "min_match_count": 8,
+    # "min_match_count": 10,
 }
 
 
@@ -97,6 +109,8 @@ def run():
         return
 
     controller = build_controller()
+    eff_min_match = controller.settings.get_settings().get("min_match_count")
+    print(f"Effective min_match_count: {eff_min_match}")
 
     references = load_references_manifest()
 
