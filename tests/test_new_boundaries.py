@@ -11,7 +11,7 @@ from app.modules.object_detection.controller import ObjectDetectionController
 from app.modules.object_detection.settings import ObjectDetectionSettings
 from app.modules.ocr.controller import OCRController
 from app.modules.ocr.settings import OCRSettings
-from app.core.state_store import StateStore
+from app.core.state import StateStore
 from app.core.config_service import ConfigService
 from app.core.models.results import DetectionResult
 
@@ -49,7 +49,7 @@ def test_measurement_0_vs_45_deg_rotated_rectangle():
 def test_measurement_judgment_boundaries():
     event_bus = MagicMock()
     settings = MeasurementSettings()
-    settings.update({"target_width_mm": 10.0, "tolerance_mm": 1.0, "judgment_roi": {"x": 0, "y": 0, "w": 100, "h": 100}})
+    settings.update({"target_width_mm": 10.0, "tolerance_mm": 1.0, "judgment_roi": {"x": 0, "y": 0, "w": 100, "h": 100}, "judge_enabled": True})
     controller = MeasurementController(event_bus, settings)
     controller.pixels_per_mm = 10.0 # so w=100px => 10mm
     
@@ -80,12 +80,12 @@ def test_object_detection_count_boundaries():
     settings = ObjectDetectionSettings()
     
     controller = ObjectDetectionController(event_bus, ai_runtime, settings)
-    controller.configure({"count_min": 2, "count_max": 4})
+    controller.configure({"count_min": 2, "count_max": 4, "judge_enabled": True})
     
     res = controller.process({"frame": np.zeros((10,10,3))})
     assert res.is_ok is True
     
-    controller.configure({"count_min": 4, "count_max": 5})
+    controller.configure({"count_min": 4, "count_max": 5, "judge_enabled": True})
     res2 = controller.process({"frame": np.zeros((10,10,3))})
     assert res2.is_ok is False
 
@@ -96,7 +96,8 @@ def test_ocr_regex_boundaries():
     
     settings = OCRSettings()
     controller = OCRController(event_bus, ai_runtime, settings)
-    controller.configure({"expected_pattern": "^PASS-\\d{3}$"})
+    controller.configure({"expected_pattern": "^PASS-\\d{3}$", "judge_enabled": True})
+
     
     # Match
     ai_runtime.predict.return_value = {"texts": [{"text": "PASS-123"}], "latency_ms": 1.0}

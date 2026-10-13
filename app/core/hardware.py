@@ -27,9 +27,11 @@ class HardwareManager:
         self._running = False
         
         # 0: Active Module ID, 1: Overall Status, 2-3: Total, 4-5: OK, 6-7: NG, 8: Heartbeat, 9: Trigger, 10: Error
-        self.store = ModbusSequentialDataBlock(0, [0] * 11)
+        self.store = ModbusSequentialDataBlock(0, [0] * 32)
+        self.coil_store = ModbusSequentialDataBlock(0, [0] * 32)
         self.context = ModbusServerContext(slaves=ModbusSlaveContext(
-            di=self.store, co=self.store, hr=self.store, ir=self.store
+            di=self.coil_store, co=self.coil_store, hr=self.store, ir=self.store,
+            zero_mode=True
         ), single=True)
         
     def initialize(self) -> bool:
@@ -68,26 +70,32 @@ class HardwareManager:
         loop_count = 0
         while self._running:
             try:
-                # Read Trigger Register (Address 9 in 0-indexed block)
+                # Fetch Active Module first so commands know target module
+                active_str = ""
+                from app.core.container import Container
+                container = Container.get_instance()
+                if container and hasattr(container, "module_controller") and container.module_controller and container.module_controller.active_metadata:
+                    active_str = container.module_controller.active_metadata.id
+
+                # 1. Check Coil 0 (Coil trigger)
+                if self.coil_store.getValues(0, 1)[0]:
+                    logger.info("Modbus trigger received via Coil 0.")
+                    self.event_bus.publish("HardwareTrigger", {})
+                    self.coil_store.setValues(0, [0])
+
+                # 2. Check Register 9 (Holding Register dedicated trigger)
                 trigger_val = self.store.getValues(9, 1)[0]
                 if trigger_val == 1:
-                    logger.info("Modbus trigger received.")
+                    logger.info("Modbus trigger received via HR 9.")
                     self.event_bus.publish("HardwareTrigger", {})
-                    # Reset trigger to 0
                     self.store.setValues(9, [0])
-                    
+
+
                 # Update Heartbeat every 10 iterations (approx 1 second)
                 loop_count += 1
                 if loop_count >= 10:
                     heartbeat = (heartbeat + 1) % 65535
                     loop_count = 0
-                
-                # Fetch Active Module
-                active_str = ""
-                from app.core.container import Container
-                container = Container.get_instance()
-                if container and container.module_controller and container.module_controller.active_metadata:
-                    active_str = container.module_controller.active_metadata.id
                 
                 module_map = {
                     "core-ocr": 1,
@@ -98,12 +106,13 @@ class HardwareManager:
                 }
                 active_numeric = module_map.get(active_str, 0)
                 
-                # Fetch StateStore counts
+                # Fetch StateStore counts for the active module
                 state = self.state_store.get_global_state()
                 status_numeric = state.get("latest_status", 0)
-                total = state.get("total_count", 0)
-                ok = state.get("ok_count", 0)
-                ng = state.get("ng_count", 0)
+                counters = self.state_store.get_counters(active_str) if hasattr(self.state_store, "get_counters") else state
+                total = counters.get("total_count", 0)
+                ok = counters.get("ok_count", 0)
+                ng = counters.get("ng_count", 0)
                 error_state = state.get("error_state", 0)
                 
                 # Big-Endian mapping
@@ -114,7 +123,7 @@ class HardwareManager:
                     (ok >> 16) & 0xFFFF, ok & 0xFFFF,
                     (ng >> 16) & 0xFFFF, ng & 0xFFFF,
                     heartbeat,
-                    self.store.getValues(9, 1)[0], # Keep trigger intact if not 1
+                    0, # trigger auto-resets to 0
                     error_state
                 ]
                 

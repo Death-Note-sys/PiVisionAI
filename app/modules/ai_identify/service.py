@@ -69,7 +69,7 @@ class AIIdentifyService(IService):
         if self.module_ref and hasattr(self.module_ref, "last_result"):
             r = self.module_ref.last_result
             status["telemetry"] = {
-                "teach_status": r.teach_status,
+                "teach_status": getattr(self.module_ref, "teach_status", r.teach_status),
                 "located": r.located,
                 "classification": r.classification,
                 "good_similarity": r.good_similarity,

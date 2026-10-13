@@ -40,6 +40,7 @@ class CameraManager:
         self._processing_thread = None
         self._cap_lock = threading.Lock()
         self.camera_settings = {}
+        self.last_readback = {}
         
     def apply_settings(self, settings: Dict[str, Any]) -> Dict[str, Any]:
         """Apply camera settings and return read-back values."""
@@ -55,7 +56,7 @@ class CameraManager:
                 val = 0.75 if settings["auto_exposure"] else 0.25
                 self.cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, val)
                 actual = self.cap.get(cv2.CAP_PROP_AUTO_EXPOSURE)
-                readback["auto_exposure"] = actual > 0.5
+                readback["auto_exposure"] = "unsupported" if actual < 0 else (actual > 0.5)
                 
             if "exposure" in settings and not settings.get("auto_exposure", True):
                 self.cap.set(cv2.CAP_PROP_EXPOSURE, settings["exposure"])
@@ -67,7 +68,8 @@ class CameraManager:
                 
             if "auto_wb" in settings:
                 self.cap.set(cv2.CAP_PROP_AUTO_WB, 1.0 if settings["auto_wb"] else 0.0)
-                readback["auto_wb"] = self.cap.get(cv2.CAP_PROP_AUTO_WB) > 0.5
+                actual_wb = self.cap.get(cv2.CAP_PROP_AUTO_WB)
+                readback["auto_wb"] = "unsupported" if actual_wb < 0 else (actual_wb > 0.5)
                 
             if "wb_temperature" in settings and not settings.get("auto_wb", True):
                 self.cap.set(cv2.CAP_PROP_WB_TEMPERATURE, settings["wb_temperature"])
@@ -81,6 +83,7 @@ class CameraManager:
                 self.cap.set(cv2.CAP_PROP_FOCUS, settings["focus"])
                 readback["focus"] = self.cap.get(cv2.CAP_PROP_FOCUS)
                 
+        self.last_readback.update(readback)
         return readback
 
     def start(self):
@@ -118,8 +121,18 @@ class CameraManager:
             if self.cap:
                 self.cap.release()
                 
-            backends = [cv2.CAP_DSHOW, cv2.CAP_MSMF, cv2.CAP_ANY] if os.name == 'nt' else [cv2.CAP_ANY]
-            configured_backend = self.config.get("camera_backend", "auto")
+            self.camera_index = int(self.config.get("camera_index", self.camera_index))
+            raw_backend = str(self.config.get("camera_backend", "auto")).lower()
+            if "dshow" in raw_backend:
+                backends = [cv2.CAP_DSHOW]
+            elif "msmf" in raw_backend:
+                backends = [cv2.CAP_MSMF]
+            elif "any" in raw_backend:
+                backends = [cv2.CAP_ANY]
+            elif "v4l" in raw_backend:
+                backends = [getattr(cv2, "CAP_V4L2", cv2.CAP_ANY)]
+            else: # "auto"
+                backends = [cv2.CAP_DSHOW, cv2.CAP_MSMF, cv2.CAP_ANY] if os.name == 'nt' else [cv2.CAP_ANY]
             
             opened = False
             for backend in backends:
@@ -127,6 +140,7 @@ class CameraManager:
                 if self.cap.isOpened():
                     opened = True
                     break
+
                     
             if not opened:
                 self.is_connected = False

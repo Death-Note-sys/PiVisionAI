@@ -18,15 +18,18 @@ class CameraService:
             target_fps=self.camera_manager.target_fps
         )
 
-    def switch_camera(self, index: int, resolution: str) -> bool:
-        """Switch camera hardware or resolution."""
+    def switch_camera(self, index: int, resolution: str, backend: str = None) -> bool:
+        """Switch camera hardware or resolution and persist settings."""
         try:
             # Need to restart camera manager to apply changes cleanly
             self.camera_manager.stop()
-            self.container.config.update_settings({
+            updates = {
                 "camera_index": index,
                 "camera_resolution": resolution
-            })
+            }
+            if backend:
+                updates["camera_backend"] = backend
+            self.container.config.update_settings(updates)
             # Re-init is handled in start based on config
             self.camera_manager.camera_index = index
             self.camera_manager.start()
@@ -34,3 +37,4 @@ class CameraService:
         except Exception as e:
             logger.error(f"Failed to switch camera: {e}")
             return False
+

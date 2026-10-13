@@ -19,7 +19,7 @@ class SessionManager:
         self.session_id = str(uuid.uuid4())
         self.start_time = datetime.now()
         
-        self.base_dir = self.config.get("data_dir", "data")
+        self.base_dir = os.path.abspath(self.config.get("data_dir", "data"))
         self.session_dir = self.base_dir
         
         self.metadata = SessionMetadata(

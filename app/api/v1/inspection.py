@@ -15,6 +15,40 @@ def get_db_path():
         data_dir = "data"
     return os.path.join(data_dir, "inspections.db")
 
+@bp.route('/status', methods=['GET'])
+def get_inspection_status():
+    """Get active module inspection counters."""
+    container = Container.get_instance()
+    active_module_id = "default"
+    if container:
+        if container.pipeline and container.pipeline.active_module:
+            active_module_id = getattr(container.pipeline.active_module, "id", "default")
+        elif container.module_controller and container.module_controller.active_metadata:
+            active_module_id = container.module_controller.active_metadata.id
+
+    counters = container.state_store.get_counters(active_module_id) if container and hasattr(container, "state_store") else {
+        "total_count": 0, "ok_count": 0, "ng_count": 0, "uncertain_count": 0
+    }
+    return jsonify({
+        "module_id": active_module_id,
+        "total_count": counters["total_count"],
+        "ok_count": counters["ok_count"],
+        "ng_count": counters["ng_count"],
+        "uncertain_count": counters.get("uncertain_count", 0)
+    })
+
+@bp.route('/reset', methods=['POST'])
+def reset_inspection_counters():
+    """Reset inspection counters for a specific module or active module."""
+    container = Container.get_instance()
+    data = request.get_json(silent=True) or {}
+    module_id = data.get("module_id")
+    if not module_id and container and container.pipeline and container.pipeline.active_module:
+        module_id = getattr(container.pipeline.active_module, "id", None)
+    if container and hasattr(container, "state_store"):
+        container.state_store.reset_counters(module_id)
+    return jsonify({"success": True, "module_id": module_id})
+
 @bp.route('/history', methods=['GET'])
 def get_history():
     """Get recent inspection history from SQLite."""

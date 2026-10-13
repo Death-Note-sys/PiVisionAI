@@ -67,7 +67,20 @@ def update_settings():
         validated = UpdateMeasurementSettingsRequest(**data)
     except ValidationError as e:
         return jsonify({"error": e.errors()}), 400
-    if measurement_service.update_settings(validated.to_update_dict()):
+    update_dict = validated.to_update_dict()
+    active_controller = getattr(measurement_service, "controller", None)
+    if not active_controller and hasattr(measurement_service, "container") and measurement_service.container:
+        active_service = measurement_service.container.module_controller.get_active_service()
+        if active_service:
+            active_controller = getattr(active_service, "controller", None)
+
+    current_settings = active_controller.settings.get_settings() if active_controller and hasattr(active_controller, "settings") else {}
+    merged_judge = update_dict["judge_enabled"] if "judge_enabled" in update_dict else current_settings.get("judge_enabled", False)
+    merged_tol = update_dict["tolerance_mm"] if "tolerance_mm" in update_dict else current_settings.get("tolerance_mm", 0.0)
+
+    if merged_judge and (merged_tol is None or merged_tol <= 0):
+        return jsonify({"error": "tolerance_mm must be > 0 when judge_enabled is True"}), 400
+    if measurement_service.update_settings(update_dict):
         return jsonify({"success": True})
     return jsonify({"error": "Failed to update settings"}), 500
 
@@ -95,6 +108,18 @@ def calibrate():
     ):
         return jsonify({"success": True})
     return jsonify({"error": "Calibration failed — check that the two points are not identical"}), 500
+
+
+@bp.route('/reset-calibration', methods=['POST'])
+def reset_calibration():
+    """Reset calibration status to Uncalibrated."""
+    try:
+        if measurement_service.reset_calibration():
+            return jsonify({"success": True})
+        return jsonify({"error": "Failed to reset calibration"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 
 @bp.route('/stream')

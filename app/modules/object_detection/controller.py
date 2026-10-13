@@ -64,10 +64,19 @@ class ObjectDetectionController(BaseModuleController):
         )
         
         is_ok = None
-        if count_min > 0 or count_max > 0:
-            if count_max == 0: count_max = 999999
-            is_ok = (count_min <= result.objects_count <= count_max)
-            result.is_ok = is_ok
+        s = self.settings.get_settings()
+        judge_enabled = s.get("judge_enabled", False)
+        if judge_enabled:
+            count_min = s.get("count_min", 0)
+            count_max = s.get("count_max", 0)
+            if count_min == 0 and count_max == 0:
+                is_ok = (result.objects_count == 0)
+            else:
+                effective_max = 999999 if count_max == 0 else count_max
+                is_ok = (count_min <= result.objects_count <= effective_max)
+        result.is_ok = is_ok
+
+
         
         if result.objects_count > 0:
             self.event_bus.publish("ObjectsDetected", {"count": result.objects_count, "model": result.model_name})

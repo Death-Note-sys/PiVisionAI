@@ -47,7 +47,8 @@ class Container:
         self.event_bus = EventBus()
         
         # Initialize Core Infrastructure
-        self.state_store = StateStore()
+        self.state_store = StateStore(persist=True)
+
         
         self.resource_manager = ResourceManager(self.event_bus)
         self.performance_monitor = PerformanceMonitor(self.event_bus)
@@ -64,7 +65,7 @@ class Container:
         self.renderer_manager = RendererManager()
         self.output_manager = OutputManager()
         self.coordinator = InspectionCoordinator(self.event_bus, self.state_store, self.output_manager)
-        self.pipeline = Pipeline(self.event_bus, self.renderer_manager, self.output_manager)
+        self.pipeline = Pipeline(self.event_bus, self.renderer_manager, self.output_manager, coordinator=self.coordinator)
         
         self.camera_manager = CameraManager(self.config, self.event_bus, self.pipeline, self.performance_monitor)
         

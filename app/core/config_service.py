@@ -44,12 +44,23 @@ class ConfigService:
                 logger.info("Loaded global settings from settings.json")
             except Exception as e:
                 logger.error(f"Failed to load settings.json: {e}")
+                try:
+                    import shutil, time
+                    corrupt_path = self.settings_file + f".corrupt_{int(time.time())}"
+                    shutil.copy2(self.settings_file, corrupt_path)
+                    logger.warning(f"Backed up corrupt settings.json to {corrupt_path}")
+                except Exception:
+                    pass
 
     def _save_json(self) -> None:
         try:
             os.makedirs(os.path.dirname(self.settings_file), exist_ok=True)
-            with open(self.settings_file, "w") as f:
+            tmp_path = self.settings_file + ".tmp"
+            with open(tmp_path, "w", encoding="utf-8") as f:
                 json.dump(self._settings.model_dump(), f, indent=4)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp_path, self.settings_file)
         except Exception as e:
             logger.error(f"Failed to save settings.json: {e}")
 

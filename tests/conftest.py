@@ -15,13 +15,13 @@ def _cleanup():
 
 atexit.register(_cleanup)
 
-# Patch default StateStore path
-from app.core.state_store import StateStore
+# Patch default StateStore data directory
+from app.core.state import StateStore
 _orig_statestore_init = StateStore.__init__
-def _mock_statestore_init(self, db_path=None):
-    if db_path is None or db_path == "app/data/pivision.db":
-        db_path = os.path.join(os.environ.get("PI_VISION_DATA_DIR", _GLOBAL_TEST_DATA), "pivision.db")
-    _orig_statestore_init(self, db_path)
+def _mock_statestore_init(self, *args, **kwargs):
+    if not args and "data_dir" not in kwargs and "db_path" not in kwargs:
+        kwargs["data_dir"] = os.environ.get("PI_VISION_DATA_DIR", _GLOBAL_TEST_DATA)
+    _orig_statestore_init(self, *args, **kwargs)
 StateStore.__init__ = _mock_statestore_init
 
 # Patch inspection db path
@@ -37,11 +37,32 @@ def isolate_data_dir():
     return _GLOBAL_TEST_DATA
 
 @pytest.fixture(autouse=True)
+def fake_cv2_videocapture(monkeypatch):
+    """Autouse fixture ensuring tests never open real cameras or start hardware capture threads."""
+    import cv2
+    class FakeVideoCapture:
+        def __init__(self, *args, **kwargs):
+            self._opened = False
+        def isOpened(self):
+            return False
+        def read(self):
+            return False, None
+        def release(self):
+            self._opened = False
+        def set(self, *args, **kwargs):
+            return False
+        def get(self, *args, **kwargs):
+            return -1.0
+    monkeypatch.setattr(cv2, "VideoCapture", FakeVideoCapture)
+
+@pytest.fixture(autouse=True)
 def clear_container():
-    """Ensure clean container instance and clean thread/modbus teardown."""
+    """Ensure clean container instance and clean thread/camera/modbus teardown."""
     from app.core.container import Container
     if Container._instance is not None:
         try:
+            if hasattr(Container._instance, "camera_manager") and Container._instance.camera_manager:
+                Container._instance.camera_manager.stop()
             Container._instance.shutdown()
         except Exception:
             pass
@@ -49,7 +70,10 @@ def clear_container():
     yield
     if Container._instance is not None:
         try:
+            if hasattr(Container._instance, "camera_manager") and Container._instance.camera_manager:
+                Container._instance.camera_manager.stop()
             Container._instance.shutdown()
         except Exception:
             pass
     Container._instance = None
+

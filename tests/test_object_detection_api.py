@@ -86,3 +86,14 @@ def test_switch_model_success(client, mock_od_service):
 
     assert response.status_code == 200
     assert response.get_json()["model_id"] == "yolo11s"
+
+
+def test_update_settings_accepts_judge_enabled_and_counts(client, mock_od_service):
+    mock_od_service.update_settings.return_value = True
+
+    payload = {"judge_enabled": True, "count_min": 0, "count_max": 0}
+    response = client.post("/api/v1/object-detection/settings", json=payload)
+
+    assert response.status_code == 200
+    mock_od_service.update_settings.assert_called_once_with(payload)
+

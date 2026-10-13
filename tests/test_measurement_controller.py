@@ -97,3 +97,17 @@ def test_configure_updates_settings(controller):
 
     assert result is True
     assert controller.settings.get_settings()["canny_low"] == 30
+
+
+def test_configure_rejects_both_orders_of_invalid_judge_and_tolerance(controller):
+    # Order 1: tolerance is 0, request enables judging -> False
+    controller.settings.update({"tolerance_mm": 0.0, "judge_enabled": False})
+    assert controller.configure({"judge_enabled": True}) is False
+
+    # Valid configure:
+    assert controller.configure({"tolerance_mm": 2.0, "judge_enabled": True}) is True
+
+    # Order 2: judging is already True, request sets tolerance <= 0 -> False
+    assert controller.configure({"tolerance_mm": 0.0}) is False
+    assert controller.configure({"tolerance_mm": -1.0}) is False
+

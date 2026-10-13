@@ -1,7 +1,7 @@
 import logging
 import time
 import threading
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 from app.core.event_bus import EventBus
 from app.core.contracts import IModule, IPipelineStage
 from app.core.renderer_manager import RendererManager
@@ -25,10 +25,11 @@ class Pipeline:
     Stages: Preprocess -> Module -> Postprocess -> Render -> Output.
     """
     
-    def __init__(self, event_bus: EventBus, renderer_manager: RendererManager, output_manager: OutputManager):
+    def __init__(self, event_bus: EventBus, renderer_manager: RendererManager, output_manager: OutputManager, coordinator: Optional[Any] = None):
         self.event_bus = event_bus
         self.renderer_manager = renderer_manager
         self.output_manager = output_manager
+        self.coordinator = coordinator
         
         self.active_module: Optional[IModule] = None
         self.preprocess_stage = PreprocessingStage()
@@ -39,7 +40,10 @@ class Pipeline:
         self._pending_trigger = False
         self._last_trigger_time = 0.0
         self._frozen_output_frame = None
+        self._next_trigger_id = 1
         self._trigger_lock = threading.Lock()
+        if self.event_bus:
+            self.event_bus.subscribe("HardwareTrigger", lambda _: self.fire_trigger())
 
     def set_module(self, module: IModule):
         """Set the active computer vision module."""
@@ -83,31 +87,34 @@ class Pipeline:
                 "last_trigger_time": self._last_trigger_time,
             }
 
-    def _should_process_frame(self) -> bool:
-        """Gate for whether process_frame() should run the active module's
-        expensive process() this cycle, or just keep the raw video flowing."""
+    def _should_process_frame(self) -> Tuple[bool, bool]:
+        """Gate for whether process_frame() should run the active module (should_process)
+        and whether this cycle counts as a triggered inspection (triggered)."""
         with self._trigger_lock:
             if self.trigger_mode == "continuous":
-                return True
+                if self._pending_trigger:
+                    self._pending_trigger = False
+                    return True, True
+                return True, False
 
             if self.trigger_mode == "single":
                 if self._pending_trigger:
                     self._pending_trigger = False
-                    return True
-                return False
+                    return True, True
+                return False, False
 
             if self.trigger_mode == "interval":
                 now = time.time()
                 if self._pending_trigger:
                     self._pending_trigger = False
                     self._last_trigger_time = now
-                    return True
+                    return True, True
                 if (now - self._last_trigger_time) >= self.trigger_interval_seconds:
                     self._last_trigger_time = now
-                    return True
-                return False
+                    return True, True
+                return False, False
 
-            return True
+            return True, False
 
     def process_frame(self, frame: Any) -> None:
         """Execute the pipeline on a single frame."""
@@ -133,7 +140,9 @@ class Pipeline:
 
         start_e2e = time.perf_counter()
 
-        if not self._should_process_frame():
+        should_process, triggered = self._should_process_frame()
+
+        if not should_process:
             with self._trigger_lock:
                 frozen = self._frozen_output_frame
             if self.trigger_mode in ("single", "interval") and frozen is not None:
@@ -169,11 +178,23 @@ class Pipeline:
                 with self._trigger_lock:
                     self._frozen_output_frame = rendered_frame.copy() if hasattr(rendered_frame, "copy") else rendered_frame
 
+            mod_id = getattr(self.active_module, "id", "unknown")
+            if triggered:
+                with self._trigger_lock:
+                    trigger_id = self._next_trigger_id
+                    self._next_trigger_id += 1
+                if self.coordinator:
+                    self.coordinator.record(result, context["original_frame"], mod_id, trigger_id)
+            else:
+                trigger_id = 0
+
             payload = {
                 "metrics": context["metrics"],
                 "result": result,
                 "frame": context["original_frame"],
-                "module_id": getattr(self.active_module, "id", "unknown")
+                "module_id": mod_id,
+                "triggered": triggered,
+                "trigger_id": trigger_id
             }
             self.event_bus.publish("FrameProcessed", payload)
 

@@ -20,7 +20,7 @@ def test_coordinator_handles_ok_result():
         "module_id": "test_module"
     }
     
-    coordinator._on_frame_processed(payload)
+    coordinator.record(payload["result"], payload["frame"], payload["module_id"], trigger_id=1)
     
     assert state_store.ok_count == 1
     assert state_store.ng_count == 0
@@ -47,7 +47,7 @@ def test_coordinator_handles_ng_result():
         "module_id": "test_module"
     }
     
-    coordinator._on_frame_processed(payload)
+    coordinator.record(payload["result"], payload["frame"], payload["module_id"], trigger_id=1)
     
     assert state_store.ok_count == 0
     assert state_store.ng_count == 1
@@ -69,11 +69,7 @@ def test_coordinator_ignores_non_inspection_results():
     class MockResult:
         unrelated = True
         
-    payload = {
-        "result": MockResult(),
-    }
-    
-    coordinator._on_frame_processed(payload)
+    coordinator.record(MockResult(), "mock_frame", "test_module", trigger_id=1)
     
     assert state_store.total_count == 0
     output_manager.save_ng.assert_not_called()

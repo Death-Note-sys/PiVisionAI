@@ -1,10 +1,24 @@
-import click
+import os
 import logging
+from logging.handlers import RotatingFileHandler
+import click
 from app.core.container import Container
 from app.api import create_app
 from app.services.system_service import SystemService
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(name)s: %(message)s')
+_log_dir = os.path.join(os.environ.get("PI_VISION_DATA_DIR", "data"), "logs")
+os.makedirs(_log_dir, exist_ok=True)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    handlers=[
+        logging.StreamHandler(),
+        RotatingFileHandler(
+            os.path.join(_log_dir, "pivision.log"),
+            maxBytes=5_000_000, backupCount=5, encoding="utf-8",
+        ),
+    ],
+)
 logger = logging.getLogger("CLI")
 
 @click.group()
@@ -25,7 +39,7 @@ def run(host, port):
         
     app = create_app()
     logger.info(f"Starting Pi Vision AI server on {host}:{port}")
-    app.run(host=host, port=port, debug=False, threaded=True)
+    app.run(host=host, port=port, debug=False, threaded=True, use_reloader=False)
 
 @cli.command()
 def doctor():
@@ -38,17 +52,8 @@ def doctor():
     click.echo(f"Camera Connected: {status['camera']['is_connected']}")
     click.echo(f"RAM Usage: {status['performance']['ram_usage_gb']} GB")
     click.echo(f"CPU Usage: {status['performance']['cpu_usage_percent']} %")
+    click.echo(f"Active Module: {status.get('active_module', 'None')}")
     click.echo("--------------------------\n")
-
-@cli.command()
-def models():
-    """List available AI models."""
-    container = Container.get_instance()
-    models = container.model_registry.list_models()
-    click.echo(f"\nDiscovered {len(models)} models:")
-    for m in models:
-        click.echo(f"- {m.name} ({m.version}) [{m.framework}]")
-    click.echo()
 
 if __name__ == '__main__':
     cli()

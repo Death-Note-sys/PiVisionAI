@@ -10,6 +10,8 @@ class OCRSettingsModel(BaseModel):
     model_id: str = "easyocr"
     canvas_size: int = 960
     expected_pattern: str = ""
+    judge_enabled: bool = False
+
 
 class OCRSettings(ISettingsProvider):
     def __init__(self):

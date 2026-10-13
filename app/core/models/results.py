@@ -35,6 +35,7 @@ class MeasurementResult(ModuleResult):
     """Standardized result for Measurements."""
     measurements: List[Dict[str, Any]] = Field(default_factory=list)
     calibration_status: str = "Uncalibrated"
+    pixels_per_mm: Optional[float] = None
     pixels_per_cm: Optional[float] = None
     is_ok: Optional[bool] = None
 

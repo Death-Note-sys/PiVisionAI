@@ -64,6 +64,9 @@ class ModuleController:
             if getattr(meta, "renderer", None):
                 self.pipeline.renderer_manager.switch_renderer(meta.renderer)
             
+            if self.state_store:
+                self.state_store.active_module_id = module_id
+            
             self.event_bus.publish("ModuleLoaded", {"module_id": module_id, "name": meta.name})
             logger.info(f"Successfully switched to module: {meta.name} ({module_id})")
             return True

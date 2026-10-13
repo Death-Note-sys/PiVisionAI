@@ -1,4 +1,5 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic_core import PydanticCustomError
 from typing import Optional, Dict, Any
 
 class CalibrationRequest(BaseModel):
@@ -20,6 +21,21 @@ class UpdateMeasurementSettingsRequest(BaseModel):
     show_dimensions: Optional[bool] = None
     unit: Optional[str] = None
     thickness: Optional[int] = Field(None, ge=1, le=10)
+    target_width_mm: Optional[float] = None
+    target_length_mm: Optional[float] = None
+    tolerance_mm: Optional[float] = None
+    judgment_roi: Optional[Dict[str, int]] = None
+    judge_enabled: Optional[bool] = None
+
+    @model_validator(mode="after")
+    def _validate_tolerance_when_judging(self):
+        if self.tolerance_mm is not None:
+            if self.tolerance_mm < 0:
+                raise PydanticCustomError("invalid_tolerance", "tolerance_mm cannot be negative", {})
+            if self.tolerance_mm == 0.0 and self.judge_enabled is True:
+                raise PydanticCustomError("invalid_tolerance", "tolerance_mm must be > 0", {})
+        return self
 
     def to_update_dict(self) -> Dict[str, Any]:
         return self.model_dump(exclude_none=True)
+

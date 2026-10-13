@@ -11,8 +11,11 @@ class MeasurementSettingsModel(BaseModel):
     unit: str = "cm"
     thickness: int = 2
     target_width_mm: float = 0.0
+    target_length_mm: float = 0.0
     tolerance_mm: float = 0.0
     judgment_roi: Dict[str, int] = {}
+    judge_enabled: bool = False
+
 
 class MeasurementSettings(ISettingsProvider):
     def __init__(self):

@@ -624,9 +624,9 @@
     </select>
     <div class="toolbar-divider"></div>
     <select class="module-select" id="cameraIndexSelect" title="Camera source">
-      <option value="0">Camera 0 (built-in)</option>
-      <option value="1">Camera 1 (USB)</option>
+      <option value="0">Camera 0</option>
     </select>
+    <button class="vp-btn" id="rescanCamerasBtn" title="Rescan Camera Devices"><i class="ti ti-refresh"></i>Rescan</button>
     <select class="module-select" id="cameraResolutionSelect" title="Resolution">
       <option value="640x480">640x480</option>
       <option value="1280x720" selected>1280x720</option>
@@ -851,12 +851,12 @@
         <button class="full-btn" id="setColorReferenceBtn"><i class="ti ti-eyedropper"></i> Set Reference Color</button>
         <button class="full-btn neutral" id="resetColorReferenceBtn" style="margin-top:6px;"><i class="ti ti-refresh"></i> Reset Reference</button>
       </div>
-      </div>
 
       <div class="inspector-section">
         <p class="inspector-title">Camera settings</p>
         <div class="toggle-row">
           <span>Auto Exposure</span>
+          <span id="autoExposureNote" style="font-size:10px; color:var(--text-warn); margin-left:auto; margin-right:8px;"></span>
           <div class="switch on" id="autoExposureToggle"></div>
         </div>
         <div class="field">
@@ -869,6 +869,7 @@
         </div>
         <div class="toggle-row">
           <span>Auto White Balance</span>
+          <span id="autoWbNote" style="font-size:10px; color:var(--text-warn); margin-left:auto; margin-right:8px;"></span>
           <div class="switch on" id="autoWbToggle"></div>
         </div>
         <div class="field">
@@ -937,11 +938,36 @@ async function apiDelete(path) {
 }
 
 // ---------- Module switching ----------
-function setActiveModule(moduleId) {
-  if (moduleId === activeModuleId) return;
-  if (isStreamRunning) stopStream();
+async function setActiveModule(moduleId, force = false) {
+  // force = true is used once on page load: activeModuleId already equals the
+  // default module then, so without it this function would return at once and
+  // never sync the server or load saved state.
+  if (!force && moduleId === activeModuleId) return;
+
+  // Wait for the old module's /stop to finish BEFORE the server switches,
+  // otherwise /stop can land on the NEW module's service.
+  if (isStreamRunning) {
+    try { await stopStream(); } catch (e) { log('Stop failed: ' + e.message, 'warn'); }
+  }
   cancelCalibration();
   cancelTeach();
+
+  try {
+    const res = await fetch('/api/v1/modules/switch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ module_id: moduleId })
+    });
+    if (!res.ok) {
+      log('Failed to switch module on server', 'warn');
+      document.getElementById('moduleSelect').value = activeModuleId;
+      return;
+    }
+  } catch (e) {
+    log('Error communicating with server: ' + e.message, 'warn');
+    document.getElementById('moduleSelect').value = activeModuleId;
+    return;
+  }
 
   activeModuleId = moduleId;
   document.getElementById('moduleSelect').value = moduleId;
@@ -960,61 +986,97 @@ function setActiveModule(moduleId) {
   if (moduleId === 'core-ai-identify') resetTeachUIState();
 
   if (moduleId === 'core-ocr' && triggerModeSelect.value === 'continuous') {
-    log('OCR is slow per-frame on CPU — switch Trigger Mode (top toolbar) to Single or Interval instead of Continuous.', 'warn');
+    log('OCR is slow per-frame on CPU - switch Trigger Mode (top toolbar) to Single or Interval instead of Continuous.', 'warn');
   }
 
   document.getElementById('statStatus').textContent = 'Idle';
   const names = { 'core-object-detection': 'Object Detection', 'core-measurement': 'Measurement', 'core-ai-identify': 'AI Identify', 'core-ocr': 'OCR', 'core-color-analysis': 'Color Analysis' };
   log('Switched to ' + (names[moduleId] || moduleId));
-  
+
   // Initialize controls and gallery from server state
-  apiGet('/status').then(status => {
-    if (status && !status.error) {
-      const settings = status.settings || {};
-      
-      if (moduleId === 'core-color-analysis') {
-        if (settings.delta_e_threshold !== undefined) {
-          document.getElementById('deltaEThresholdSlider').value = settings.delta_e_threshold;
-          document.getElementById('deltaEThresholdVal').textContent = settings.delta_e_threshold;
-        }
-        if (status.telemetry && status.telemetry.reference_status === 'Taught') {
-          const swatch = document.getElementById('referenceSwatch');
-          swatch.style.backgroundImage = `url('/api/v1/modules/active/gallery/color/0?t=${Date.now()}')`;
-          swatch.style.backgroundSize = 'cover';
-        } else {
-          document.getElementById('referenceSwatch').style.backgroundImage = 'none';
-        }
-      } else if (moduleId === 'core-ai-identify') {
-        if (settings.match_threshold !== undefined) {
-          const matchEl = document.getElementById('matchThresholdSlider');
-          if (matchEl) matchEl.value = settings.match_threshold;
-          const matchValEl = document.getElementById('matchThresholdVal');
-          if (matchValEl) matchValEl.textContent = settings.match_threshold;
-        }
-        
-        // Rebuild galleries
-        const telemetry = status.telemetry || {};
-        const gc = telemetry.good_reference_count || 0;
-        const bc = telemetry.bad_reference_count || 0;
-        
-        goodThumbnails.length = 0;
-        for (let i = 0; i < gc; i++) {
-          goodThumbnails.push(`/api/v1/modules/active/gallery/good/${i}`);
-        }
-        renderGallery(document.getElementById('goodGallery'), goodThumbnails, 'good');
-        
-        badThumbnails.length = 0;
-        for (let i = 0; i < bc; i++) {
-          badThumbnails.push(`/api/v1/modules/active/gallery/bad/${i}`);
-        }
-        renderGallery(document.getElementById('badGallery'), badThumbnails, 'bad');
-      } else if (moduleId === 'core-measurement') {
-         if (settings.pixels_per_mm !== undefined && settings.pixels_per_mm !== null) {
-            document.getElementById('statPxPerMm').textContent = settings.pixels_per_mm.toFixed(2);
-         }
+  try {
+    await updateModuleUIFromServer(moduleId);
+  } catch (e) {
+    log('Could not load saved state for this module: ' + e.message, 'warn');
+  }
+}
+
+function setIfPresent(id, fn) {
+  const el = document.getElementById(id);
+  if (el) fn(el);
+}
+function restoreSlider(sliderId, valueId, value, decimals) {
+  if (value === undefined || value === null) return;
+  const text = (decimals !== undefined) ? Number(value).toFixed(decimals) : String(value);
+  setIfPresent(sliderId, el => { el.value = value; });
+  setIfPresent(valueId, el => { el.textContent = text; });
+}
+function restoreToggle(id, value) {
+  if (value === undefined || value === null) return;
+  setIfPresent(id, el => el.classList.toggle('on', !!value));
+}
+
+async function updateModuleUIFromServer(moduleId) {
+  const status = await apiGet('/status');
+  if (!status || status.error) return;
+  const s = status.settings || {};
+  const t = status.telemetry || {};
+
+  if (moduleId === 'core-object-detection') {
+    restoreSlider('confSlider', 'confVal', s.confidence, 2);
+    restoreSlider('iouSlider', 'iouVal', s.iou, 2);
+    restoreToggle('labelsToggle', s.show_labels);
+    restoreToggle('confToggle', s.show_conf);
+
+  } else if (moduleId === 'core-measurement') {
+    restoreSlider('cannyLowSlider', 'cannyLowVal', s.canny_low);
+    restoreSlider('cannyHighSlider', 'cannyHighVal', s.canny_high);
+    restoreSlider('minAreaSlider', 'minAreaVal', s.min_contour_area);
+    if (s.unit) {
+      setIfPresent('unitSelect', el => {
+        if (Array.from(el.options).some(o => o.value === s.unit)) el.value = s.unit;
+      });
+    }
+    restoreToggle('showDimsToggle', s.show_dimensions);
+    if (t.pixels_per_mm !== undefined && t.pixels_per_mm !== null) {
+      setIfPresent('statPxPerMm', el => { el.textContent = Number(t.pixels_per_mm).toFixed(2); });
+    }
+
+  } else if (moduleId === 'core-ocr') {
+    restoreSlider('ocrConfSlider', 'ocrConfVal', s.min_confidence, 2);
+    restoreToggle('ocrShowTextToggle', s.show_text);
+    restoreToggle('ocrShowConfToggle', s.show_confidence);
+
+  } else if (moduleId === 'core-color-analysis') {
+    restoreSlider('numColorsSlider', 'numColorsVal', s.num_colors);
+    restoreSlider('deltaEThresholdSlider', 'deltaEThresholdVal', s.delta_e_threshold, 1);
+    restoreToggle('showColorsToggle', s.show_dominant_colors);
+    restoreToggle('showColorMatchToggle', s.show_reference_match);
+    const swatch = document.getElementById('colorRefSwatch');
+    const emptyLabel = document.getElementById('colorRefEmptyLabel');
+    if (swatch) {
+      if (t.reference_status === 'Taught') {
+        swatch.style.backgroundImage = "url('/api/v1/modules/active/gallery/color/0?t=" + Date.now() + "')";
+        swatch.classList.add('filled');
+        if (emptyLabel) emptyLabel.classList.add('hidden');
+      } else {
+        swatch.style.backgroundImage = '';
+        swatch.classList.remove('filled');
+        if (emptyLabel) emptyLabel.classList.remove('hidden');
       }
     }
-  }).catch(e => console.error("Failed to fetch initial status", e));
+
+  } else if (moduleId === 'core-ai-identify') {
+    const gc = t.good_reference_count || 0;
+    const bc = t.bad_reference_count || 0;
+    const stamp = Date.now();
+    goodThumbnails.length = 0;
+    for (let i = 0; i < gc; i++) goodThumbnails.push('/api/v1/modules/active/gallery/good/' + i + '?t=' + stamp);
+    badThumbnails.length = 0;
+    for (let i = 0; i < bc; i++) badThumbnails.push('/api/v1/modules/active/gallery/bad/' + i + '?t=' + stamp);
+    renderGallery(document.getElementById('goodGallery'), goodThumbnails, 'good');
+    renderGallery(document.getElementById('badGallery'), badThumbnails, 'bad');
+  }
 }
 
 document.querySelectorAll('.tool-btn[data-module]').forEach(btn => {
@@ -1775,6 +1837,7 @@ const autoWbToggle = document.getElementById('autoWbToggle');
 const wbSlider = document.getElementById('wbSlider');
 const wbVal = document.getElementById('wbVal');
 
+let cameraUpdateTimer = null;
 async function updateCameraSettings(payload) {
   try {
     const res = await fetch('/api/v1/camera/settings', {
@@ -1783,30 +1846,106 @@ async function updateCameraSettings(payload) {
       body: JSON.stringify(payload)
     });
     const data = await res.json();
-    if (data.readback) {
-      if (data.readback.auto_exposure !== undefined) {
-        autoExposureToggle.classList.toggle('on', data.readback.auto_exposure);
-        exposureSlider.disabled = data.readback.auto_exposure;
-      }
-      if (data.readback.exposure !== undefined) exposureVal.textContent = data.readback.exposure;
-      if (data.readback.gain !== undefined) gainVal.textContent = data.readback.gain;
-      if (data.readback.auto_wb !== undefined) {
-        autoWbToggle.classList.toggle('on', data.readback.auto_wb);
-        wbSlider.disabled = data.readback.auto_wb;
-      }
-      if (data.readback.wb_temperature !== undefined) wbVal.textContent = data.readback.wb_temperature;
-    }
+    
+    if (cameraUpdateTimer) clearTimeout(cameraUpdateTimer);
+    cameraUpdateTimer = setTimeout(() => {
+        if (data.readback) {
+            const r = data.readback;
+            
+            if (r.auto_exposure === 'unsupported') {
+                autoExposureToggle.classList.remove('on');
+                autoExposureToggle.style.pointerEvents = 'none';
+                autoExposureToggle.style.opacity = '0.5';
+                document.getElementById('autoExposureNote').textContent = "driver doesn't report state";
+                exposureSlider.disabled = false;
+            } else if (r.auto_exposure !== undefined) {
+                autoExposureToggle.classList.toggle('on', r.auto_exposure === true);
+                exposureSlider.disabled = (r.auto_exposure === true);
+                document.getElementById('autoExposureNote').textContent = '';
+            }
+
+            if (r.auto_wb === 'unsupported') {
+                autoWbToggle.classList.remove('on');
+                autoWbToggle.style.pointerEvents = 'none';
+                autoWbToggle.style.opacity = '0.5';
+                document.getElementById('autoWbNote').textContent = "driver doesn't report state";
+                wbSlider.disabled = false;
+            } else if (r.auto_wb !== undefined) {
+                autoWbToggle.classList.toggle('on', r.auto_wb === true);
+                wbSlider.disabled = (r.auto_wb === true);
+                document.getElementById('autoWbNote').textContent = '';
+            }
+
+            if (payload.exposure !== undefined) {
+                if (r.exposure !== undefined && Math.abs(r.exposure - payload.exposure) > 0.01) {
+                    exposureVal.textContent = `${payload.exposure} (driver reports: ${r.exposure}, ignored by driver)`;
+                    exposureVal.style.color = 'var(--text-warn)';
+                } else {
+                    exposureVal.textContent = payload.exposure;
+                    exposureVal.style.color = '';
+                }
+            }
+            
+            if (payload.gain !== undefined) {
+                if (r.gain !== undefined && Math.abs(r.gain - payload.gain) > 0.01) {
+                    gainVal.textContent = `${payload.gain} (driver reports: ${r.gain}, ignored by driver)`;
+                    gainVal.style.color = 'var(--text-warn)';
+                } else {
+                    gainVal.textContent = payload.gain;
+                    gainVal.style.color = '';
+                }
+            }
+            
+            if (payload.wb_temperature !== undefined) {
+                if (r.wb_temperature !== undefined && Math.abs(r.wb_temperature - payload.wb_temperature) > 0.01) {
+                    wbVal.textContent = `${payload.wb_temperature} (driver reports: ${r.wb_temperature}, ignored by driver)`;
+                    wbVal.style.color = 'var(--text-warn)';
+                } else {
+                    wbVal.textContent = payload.wb_temperature;
+                    wbVal.style.color = '';
+                }
+            }
+        }
+    }, 500);
   } catch (e) {
     console.error("Camera update error:", e);
   }
 }
 
+async function initCameraSettingsUI() {
+  try {
+    const res = await fetch('/api/v1/camera/settings');
+    const data = await res.json();
+    if (data.settings) {
+      const r = data.settings;
+      if (r.auto_exposure === 'unsupported') {
+        autoExposureToggle.classList.remove('on');
+        autoExposureToggle.style.pointerEvents = 'none';
+        autoExposureToggle.style.opacity = '0.5';
+        document.getElementById('autoExposureNote').textContent = "driver doesn't report state";
+        exposureSlider.disabled = false;
+      }
+      if (r.auto_wb === 'unsupported') {
+        autoWbToggle.classList.remove('on');
+        autoWbToggle.style.pointerEvents = 'none';
+        autoWbToggle.style.opacity = '0.5';
+        document.getElementById('autoWbNote').textContent = "driver doesn't report state";
+        wbSlider.disabled = false;
+      }
+    }
+  } catch(e) {}
+}
+initCameraSettingsUI();
+
 autoExposureToggle.addEventListener('click', () => {
   const isAuto = !autoExposureToggle.classList.contains('on');
+  autoExposureToggle.classList.toggle('on', isAuto);
+  exposureSlider.disabled = isAuto;
   updateCameraSettings({ auto_exposure: isAuto });
 });
 exposureSlider.addEventListener('change', () => {
-  updateCameraSettings({ exposure: parseFloat(exposureSlider.value) });
+  const isAuto = autoExposureToggle.classList.contains('on');
+  updateCameraSettings({ exposure: parseFloat(exposureSlider.value), auto_exposure: isAuto });
 });
 exposureSlider.addEventListener('input', () => { exposureVal.textContent = exposureSlider.value; });
 
@@ -1817,12 +1956,84 @@ gainSlider.addEventListener('input', () => { gainVal.textContent = gainSlider.va
 
 autoWbToggle.addEventListener('click', () => {
   const isAuto = !autoWbToggle.classList.contains('on');
+  autoWbToggle.classList.toggle('on', isAuto);
+  wbSlider.disabled = isAuto;
   updateCameraSettings({ auto_wb: isAuto });
 });
 wbSlider.addEventListener('change', () => {
-  updateCameraSettings({ wb_temperature: parseFloat(wbSlider.value) });
+  const isAuto = autoWbToggle.classList.contains('on');
+  updateCameraSettings({ wb_temperature: parseFloat(wbSlider.value), auto_wb: isAuto });
 });
 wbSlider.addEventListener('input', () => { wbVal.textContent = wbSlider.value; });
+
+// Camera scanning and switching
+const cameraIndexSelect = document.getElementById('cameraIndexSelect');
+const rescanCamerasBtn = document.getElementById('rescanCamerasBtn');
+const cameraResolutionSelect = document.getElementById('cameraResolutionSelect');
+
+async function scanCameraDevices() {
+  if (isStreamRunning) {
+    log('Stop camera stream before scanning devices', 'warn');
+    return;
+  }
+  try {
+    const res = await fetch('/api/v1/camera/devices');
+    const data = await res.json();
+    if (data.devices) {
+      cameraIndexSelect.innerHTML = '';
+      data.devices.forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d.index;
+        if (d.opened) {
+          opt.textContent = 'Camera ' + d.index + ' (' + d.width + 'x' + d.height + ')';
+        } else {
+          opt.textContent = 'Camera ' + d.index + ' (Unavailable)';
+          opt.disabled = true;
+        }
+        cameraIndexSelect.appendChild(opt);
+      });
+      const sysRes = await fetch('/api/v1/system/status');
+      const sys = await sysRes.json();
+      if (sys && sys.camera_index !== undefined) {
+        cameraIndexSelect.value = String(sys.camera_index);
+      }
+    }
+  } catch(e) {
+    log('Failed to scan camera devices: ' + e.message, 'warn');
+  }
+}
+
+if (rescanCamerasBtn) {
+  rescanCamerasBtn.addEventListener('click', () => scanCameraDevices());
+}
+
+async function switchCameraHardware() {
+  const index = parseInt(cameraIndexSelect.value) || 0;
+  const resolution = cameraResolutionSelect.value || '1280x720';
+  try {
+    const res = await fetch('/api/v1/camera/switch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ index, resolution })
+    });
+    const data = await res.json();
+    if (data.success) {
+      log('Switched to Camera ' + index + ' (' + resolution + ')');
+    } else {
+      log('Camera switch failed: ' + (data.error || 'unknown error'), 'error');
+    }
+  } catch(e) {
+    log('Camera switch request failed: ' + e.message, 'error');
+  }
+}
+
+if (cameraIndexSelect) cameraIndexSelect.addEventListener('change', switchCameraHardware);
+if (cameraResolutionSelect) cameraResolutionSelect.addEventListener('change', switchCameraHardware);
+scanCameraDevices();
+
+// Initialize the backend and UI state on page load (force = true: see setActiveModule)
+setActiveModule(activeModuleId, true);
+
 
 </script>
 <div id="counters">Yield: 100% <button>Reset counters</button></div>

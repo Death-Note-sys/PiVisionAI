@@ -62,5 +62,13 @@ class MeasurementService:
             return service.calibrate(x1, y1, x2, y2, real_length_mm)
         return False
 
+    def reset_calibration(self) -> bool:
+        if not self._ensure_active():
+            return False
+        service = self.container.module_controller.get_active_service()
+        if service and hasattr(service, "reset_calibration"):
+            return service.reset_calibration()
+        return False
+
     def get_latest_jpeg(self) -> bytes:
         return self.container.pipeline.output_manager.get_latest_jpeg()

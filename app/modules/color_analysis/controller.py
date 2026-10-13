@@ -23,6 +23,12 @@ class ColorAnalysisController(BaseModuleController):
         # Load settings
         saved_settings = self.load_settings()
         if saved_settings:
+            if "version" not in saved_settings or saved_settings.get("version", 0) < 1:
+                logger.info("ColorAnalysis: Migrating unversioned settings to version 1")
+                if saved_settings.get("delta_e_threshold") == 30.5:
+                    saved_settings["delta_e_threshold"] = 25.0
+                saved_settings["version"] = 1
+                self.save_settings(saved_settings)
             self.settings.update(saved_settings)
             
         # Load teach data

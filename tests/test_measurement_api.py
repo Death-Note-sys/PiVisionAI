@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 from app.api import create_app
 
 
@@ -76,3 +76,48 @@ def test_settings_rejects_invalid_canny_threshold(client, mock_measurement_servi
     response = client.post("/api/v1/measurement/settings", json={"canny_low": 999})
 
     assert response.status_code == 400
+
+
+def test_settings_accepts_judgment_settings(client, mock_measurement_service):
+    mock_measurement_service.update_settings.return_value = True
+    payload = {
+        "target_width_mm": 25.4,
+        "target_length_mm": 50.8,
+        "tolerance_mm": 1.5,
+        "judgment_roi": {"x": 10, "y": 20, "w": 200, "h": 150},
+        "judge_enabled": True
+    }
+    response = client.post("/api/v1/measurement/settings", json=payload)
+    assert response.status_code == 200
+    mock_measurement_service.update_settings.assert_called_once_with(payload)
+
+
+def test_settings_rejects_non_positive_tolerance(client, mock_measurement_service):
+    response = client.post("/api/v1/measurement/settings", json={"tolerance_mm": 0.0, "judge_enabled": True})
+    assert response.status_code == 400
+
+    response2 = client.post("/api/v1/measurement/settings", json={"tolerance_mm": -1.5})
+    assert response2.status_code == 400
+
+
+def test_settings_rejects_judge_enabled_without_positive_tolerance(client, mock_measurement_service):
+    mock_measurement_service.controller = None
+    response = client.post("/api/v1/measurement/settings", json={"judge_enabled": True, "tolerance_mm": 0.0})
+    assert response.status_code == 400
+
+
+def test_settings_rejects_both_request_orders_against_merged_state(client, mock_measurement_service):
+    mock_ctrl = MagicMock()
+    mock_measurement_service.controller = mock_ctrl
+
+    # Order 1: saved tolerance is 0, request enables judging -> 400
+    mock_ctrl.settings.get_settings.return_value = {"tolerance_mm": 0.0, "judge_enabled": False}
+    res1 = client.post("/api/v1/measurement/settings", json={"judge_enabled": True})
+    assert res1.status_code == 400
+
+    # Order 2: saved judging is True, request sets tolerance to 0.0 -> 400
+    mock_ctrl.settings.get_settings.return_value = {"tolerance_mm": 2.0, "judge_enabled": True}
+    res2 = client.post("/api/v1/measurement/settings", json={"tolerance_mm": 0.0})
+    assert res2.status_code == 400
+
+

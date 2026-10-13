@@ -7,8 +7,10 @@ logger = logging.getLogger(__name__)
 class SystemService:
     """Business logic for system-level operations (Telemetry, Sessions, Config)."""
     
-    def __init__(self):
-        self.container = Container.get_instance()
+    @property
+    def container(self):
+        return Container.get_instance()
+
 
     def get_status(self) -> Dict[str, Any]:
         """Aggregate system status across all core components."""

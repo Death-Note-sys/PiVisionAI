@@ -39,9 +39,14 @@ class MeasurementService(IService):
             return self.module_ref.configure(new_settings)
         return self.settings.update(new_settings)
 
-    def calibrate(self, x1: int, y1: int, x2: int, y2: int, real_length_cm: float) -> bool:
+    def calibrate(self, x1: int, y1: int, x2: int, y2: int, real_length_mm: float) -> bool:
         if self.module_ref and hasattr(self.module_ref, "calibrate"):
-            return self.module_ref.calibrate(x1, y1, x2, y2, real_length_cm)
+            return self.module_ref.calibrate(x1, y1, x2, y2, real_length_mm)
+        return False
+
+    def reset_calibration(self) -> bool:
+        if self.module_ref and hasattr(self.module_ref, "reset_calibration"):
+            return self.module_ref.reset_calibration()
         return False
 
     def get_status(self) -> Dict[str, Any]:
@@ -55,7 +60,8 @@ class MeasurementService(IService):
             status["telemetry"] = {
                 "measurement_count": len(r.measurements),
                 "calibration_status": r.calibration_status,
-                "pixels_per_cm": r.pixels_per_cm,
+                "pixels_per_mm": getattr(r, "pixels_per_mm", None),
+                "pixels_per_cm": getattr(r, "pixels_per_cm", None),
                 "latency_ms": r.latency_ms,
             }
         return status

@@ -9,6 +9,7 @@ class ColorAnalysisSettingsModel(BaseModel):
     show_dominant_colors: bool = True
     show_reference_match: bool = True
     thickness: int = 2
+    version: int = 1
 
 class ColorAnalysisSettings(ISettingsProvider):
     def __init__(self):

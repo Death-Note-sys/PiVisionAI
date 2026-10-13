@@ -1,5 +1,7 @@
 import os
 import json
+import time
+import shutil
 import logging
 import cv2
 import numpy as np
@@ -27,47 +29,53 @@ class BaseModuleController(IModule):
             self.settings_file = None
             self.data_file = None
 
-    def load_settings(self) -> Dict[str, Any]:
-        """Loads settings from disk if available."""
-        if not self.settings_file or not os.path.exists(self.settings_file):
+    def _safe_load_json(self, filepath: Optional[str]) -> Dict[str, Any]:
+        """Safely loads JSON with corrupt-file backup."""
+        if not filepath or not os.path.exists(filepath):
             return {}
         try:
-            with open(self.settings_file, 'r') as f:
+            with open(filepath, 'r', encoding='utf-8') as f:
                 return json.load(f)
         except Exception as e:
-            logger.error(f"Failed to load settings for module {self.id}: {e}")
+            logger.error(f"Failed to load JSON from {filepath}: {e}")
+            try:
+                corrupt_backup = filepath + f".corrupt_{int(time.time())}"
+                shutil.copy2(filepath, corrupt_backup)
+                logger.warning(f"Backed up corrupt file {filepath} -> {corrupt_backup}")
+            except Exception:
+                pass
             return {}
-            
-    def save_settings(self, settings: Dict[str, Any]):
-        """Saves current settings to disk."""
-        if not self.settings_file:
+
+    def _atomic_save_json(self, filepath: Optional[str], data: Dict[str, Any]):
+        """Atomically saves JSON via .tmp + os.replace."""
+        if not filepath:
             return
         try:
-            with open(self.settings_file, 'w') as f:
-                json.dump(settings, f, indent=4)
+            os.makedirs(os.path.dirname(filepath), exist_ok=True)
+            tmp_path = filepath + ".tmp"
+            with open(tmp_path, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=4)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp_path, filepath)
         except Exception as e:
-            logger.error(f"Failed to save settings for module {self.id}: {e}")
+            logger.error(f"Failed to atomically save JSON to {filepath}: {e}")
+
+    def load_settings(self) -> Dict[str, Any]:
+        """Loads settings from disk if available."""
+        return self._safe_load_json(self.settings_file)
+            
+    def save_settings(self, settings: Dict[str, Any]):
+        """Saves current settings to disk atomically."""
+        self._atomic_save_json(self.settings_file, settings)
 
     def load_data(self) -> Dict[str, Any]:
         """Loads non-settings teach/calibration data."""
-        if not self.data_file or not os.path.exists(self.data_file):
-            return {}
-        try:
-            with open(self.data_file, 'r') as f:
-                return json.load(f)
-        except Exception as e:
-            logger.error(f"Failed to load data for module {self.id}: {e}")
-            return {}
+        return self._safe_load_json(self.data_file)
 
     def save_data(self, data: Dict[str, Any]):
-        """Saves non-settings teach/calibration data."""
-        if not self.data_file:
-            return
-        try:
-            with open(self.data_file, 'w') as f:
-                json.dump(data, f, indent=4)
-        except Exception as e:
-            logger.error(f"Failed to save data for module {self.id}: {e}")
+        """Saves non-settings teach/calibration data atomically."""
+        self._atomic_save_json(self.data_file, data)
             
     def save_image(self, filename: str, image: np.ndarray):
         """Saves an image into the module's persistence directory."""

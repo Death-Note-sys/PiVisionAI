@@ -64,6 +64,7 @@ def create_app() -> Flask:
     @app.route('/gallery')
     def gallery():
         return render_template('gallery.html')
+
         
     # 4. Security: Global Exception Handling
     @app.errorhandler(Exception)

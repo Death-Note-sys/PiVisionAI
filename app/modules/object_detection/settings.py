@@ -11,6 +11,8 @@ class ODSettingsModel(BaseModel):
     model_id: str = "yolo11n"
     count_min: int = 0
     count_max: int = 0
+    judge_enabled: bool = False
+
 
 class ObjectDetectionSettings(ISettingsProvider):
     def __init__(self):

@@ -203,6 +203,10 @@ class AIIdentifyController(BaseModuleController):
             self.good_references = []
             self.bad_references = []
             self.teach_status = "Untaught"
+            if hasattr(self, "last_result") and self.last_result:
+                self.last_result.teach_status = "Untaught"
+                self.last_result.classification = None
+                self.last_result.located = False
             
         import glob, os
         if self.module_dir:

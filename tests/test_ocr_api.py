@@ -55,3 +55,21 @@ def test_settings_accepts_valid_payload(client, mock_ocr_service):
 
     assert response.status_code == 200
     mock_ocr_service.update_settings.assert_called_once_with({"min_confidence": 0.5})
+
+
+def test_settings_rejects_invalid_regex_pattern(client, mock_ocr_service):
+    response = client.post("/api/v1/ocr/settings", json={"expected_pattern": "["})
+
+    assert response.status_code == 400
+    mock_ocr_service.update_settings.assert_not_called()
+
+
+def test_settings_accepts_valid_pattern_and_judge_enabled(client, mock_ocr_service):
+    mock_ocr_service.update_settings.return_value = True
+
+    payload = {"expected_pattern": "^[A-Z0-9]+$", "judge_enabled": True}
+    response = client.post("/api/v1/ocr/settings", json=payload)
+
+    assert response.status_code == 200
+    mock_ocr_service.update_settings.assert_called_once_with(payload)
+

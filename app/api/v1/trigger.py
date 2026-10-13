@@ -43,11 +43,13 @@ def set_interval():
     return jsonify({"error": "Failed to set interval"}), 500
 
 
+import time
+
 @bp.route('/fire', methods=['POST'])
 def fire():
     if trigger_service.fire():
-        return jsonify({"success": True})
-    return jsonify({"error": "Failed to fire trigger"}), 500
+        return jsonify({"success": True, "status": "triggered", "timestamp": time.time()})
+    return jsonify({"success": False, "error": "Failed to fire trigger"}), 500
 
 
 @bp.route('/status', methods=['GET'])

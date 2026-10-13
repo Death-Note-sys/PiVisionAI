@@ -60,7 +60,8 @@ class OCRController(BaseModuleController):
         )
         
         is_ok = None
-        if expected_pattern:
+        judge_enabled = settings.get("judge_enabled", False)
+        if judge_enabled and expected_pattern:
             is_ok = False
             try:
                 regex = re.compile(expected_pattern)
@@ -72,6 +73,7 @@ class OCRController(BaseModuleController):
                 logger.error(f"Invalid regex '{expected_pattern}': {e}")
                 is_ok = False
         result.is_ok = is_ok
+
         
         self.last_result = result
 

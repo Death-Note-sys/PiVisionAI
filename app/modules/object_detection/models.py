@@ -10,6 +10,10 @@ class UpdateSettingsRequest(BaseModel):
     show_conf: Optional[bool] = None
     thickness: Optional[int] = Field(None, ge=1, le=10)
     model_id: Optional[str] = None
+    count_min: Optional[int] = None
+    count_max: Optional[int] = None
+    judge_enabled: Optional[bool] = None
+
 
     def to_update_dict(self) -> Dict[str, Any]:
         """Only include fields the client actually set."""
