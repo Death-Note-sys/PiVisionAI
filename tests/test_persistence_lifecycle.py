@@ -68,6 +68,15 @@ def test_per_module_settings_survive_new_controller_instance():
     assert c_ms2.settings.get_settings()["tolerance_mm"] == pytest.approx(1.5)
 
 def test_measurement_calibration_persists_and_resets():
+    # --- isolation: remove any leftover calibration data from other tests ---
+    from app.core.container import Container
+    _container = Container.get_instance()
+    _meas_dir = _container.session_manager.get_data_dir("modules/core-measurement")
+    _data_json = os.path.join(_meas_dir, "data.json")
+    if os.path.exists(_data_json):
+        os.remove(_data_json)
+    # -----------------------------------------------------------------------
+
     bus = EventBus()
     c1 = MeasurementController(bus, MeasurementSettings())
     assert c1.calibrate(x1=0, y1=0, x2=200, y2=0, real_length_mm=40.0) is True
@@ -88,6 +97,7 @@ def test_measurement_calibration_persists_and_resets():
     c3 = MeasurementController(bus, MeasurementSettings())
     assert c3.calibration_status == "Uncalibrated"
     assert c3.pixels_per_mm is None
+
 
 def test_measurement_legacy_pixels_per_cm_migration():
     bus = EventBus()
