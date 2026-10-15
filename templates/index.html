@@ -1845,95 +1845,100 @@ async function updateCameraSettings(payload) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
+    if (!res.ok) {
+      log('Camera settings update returned HTTP ' + res.status, 'warn');
+      return;
+    }
     const data = await res.json();
-    
-    if (cameraUpdateTimer) clearTimeout(cameraUpdateTimer);
-    cameraUpdateTimer = setTimeout(() => {
-        if (data.readback) {
-            const r = data.readback;
-            
-            if (r.auto_exposure === 'unsupported') {
-                autoExposureToggle.classList.remove('on');
-                autoExposureToggle.style.pointerEvents = 'none';
-                autoExposureToggle.style.opacity = '0.5';
-                document.getElementById('autoExposureNote').textContent = "driver doesn't report state";
-                exposureSlider.disabled = false;
-            } else if (r.auto_exposure !== undefined) {
-                autoExposureToggle.classList.toggle('on', r.auto_exposure === true);
-                exposureSlider.disabled = (r.auto_exposure === true);
-                document.getElementById('autoExposureNote').textContent = '';
-            }
+    const r = data.readback || {};
+    const s = data.settings || {};
 
-            if (r.auto_wb === 'unsupported') {
-                autoWbToggle.classList.remove('on');
-                autoWbToggle.style.pointerEvents = 'none';
-                autoWbToggle.style.opacity = '0.5';
-                document.getElementById('autoWbNote').textContent = "driver doesn't report state";
-                wbSlider.disabled = false;
-            } else if (r.auto_wb !== undefined) {
-                autoWbToggle.classList.toggle('on', r.auto_wb === true);
-                wbSlider.disabled = (r.auto_wb === true);
-                document.getElementById('autoWbNote').textContent = '';
-            }
+    if (r.auto_exposure === 'unsupported') {
+      document.getElementById('autoExposureNote').textContent = "driver doesn't report state";
+      exposureSlider.disabled = false;
+    } else if (r.auto_exposure !== undefined) {
+      autoExposureToggle.classList.toggle('on', r.auto_exposure === true);
+      exposureSlider.disabled = (r.auto_exposure === true);
+      document.getElementById('autoExposureNote').textContent = '';
+    }
 
-            if (payload.exposure !== undefined) {
-                if (r.exposure !== undefined && Math.abs(r.exposure - payload.exposure) > 0.01) {
-                    exposureVal.textContent = `${payload.exposure} (driver reports: ${r.exposure}, ignored by driver)`;
-                    exposureVal.style.color = 'var(--text-warn)';
-                } else {
-                    exposureVal.textContent = payload.exposure;
-                    exposureVal.style.color = '';
-                }
-            }
-            
-            if (payload.gain !== undefined) {
-                if (r.gain !== undefined && Math.abs(r.gain - payload.gain) > 0.01) {
-                    gainVal.textContent = `${payload.gain} (driver reports: ${r.gain}, ignored by driver)`;
-                    gainVal.style.color = 'var(--text-warn)';
-                } else {
-                    gainVal.textContent = payload.gain;
-                    gainVal.style.color = '';
-                }
-            }
-            
-            if (payload.wb_temperature !== undefined) {
-                if (r.wb_temperature !== undefined && Math.abs(r.wb_temperature - payload.wb_temperature) > 0.01) {
-                    wbVal.textContent = `${payload.wb_temperature} (driver reports: ${r.wb_temperature}, ignored by driver)`;
-                    wbVal.style.color = 'var(--text-warn)';
-                } else {
-                    wbVal.textContent = payload.wb_temperature;
-                    wbVal.style.color = '';
-                }
-            }
-        }
-    }, 500);
+    if (r.auto_wb === 'unsupported') {
+      document.getElementById('autoWbNote').textContent = "driver doesn't report state";
+      wbSlider.disabled = false;
+    } else if (r.auto_wb !== undefined) {
+      autoWbToggle.classList.toggle('on', r.auto_wb === true);
+      wbSlider.disabled = (r.auto_wb === true);
+      document.getElementById('autoWbNote').textContent = '';
+    }
+
+    if (payload.exposure !== undefined) {
+      exposureVal.textContent = payload.exposure;
+      if (r.exposure !== undefined && r.exposure >= -100 && Math.abs(r.exposure - payload.exposure) > 0.01) {
+        exposureVal.textContent = `${payload.exposure} (driver: ${r.exposure})`;
+      }
+    }
+
+    if (payload.gain !== undefined) {
+      gainVal.textContent = payload.gain;
+      if (r.gain !== undefined && r.gain >= 0 && Math.abs(r.gain - payload.gain) > 0.01) {
+        gainVal.textContent = `${payload.gain} (driver: ${r.gain})`;
+      }
+    }
+
+    if (payload.wb_temperature !== undefined) {
+      wbVal.textContent = payload.wb_temperature;
+      if (r.wb_temperature !== undefined && r.wb_temperature > 0 && Math.abs(r.wb_temperature - payload.wb_temperature) > 0.01) {
+        wbVal.textContent = `${payload.wb_temperature} (driver: ${r.wb_temperature})`;
+      }
+    }
   } catch (e) {
     console.error("Camera update error:", e);
+    log("Camera update error: " + e.message, "warn");
   }
 }
 
 async function initCameraSettingsUI() {
   try {
     const res = await fetch('/api/v1/camera/settings');
+    if (!res.ok) return;
     const data = await res.json();
-    if (data.settings) {
-      const r = data.settings;
-      if (r.auto_exposure === 'unsupported') {
-        autoExposureToggle.classList.remove('on');
-        autoExposureToggle.style.pointerEvents = 'none';
-        autoExposureToggle.style.opacity = '0.5';
-        document.getElementById('autoExposureNote').textContent = "driver doesn't report state";
-        exposureSlider.disabled = false;
-      }
-      if (r.auto_wb === 'unsupported') {
-        autoWbToggle.classList.remove('on');
-        autoWbToggle.style.pointerEvents = 'none';
-        autoWbToggle.style.opacity = '0.5';
-        document.getElementById('autoWbNote').textContent = "driver doesn't report state";
-        wbSlider.disabled = false;
-      }
+    const s = data.settings || {};
+    const r = data.readback || {};
+
+    if (s.auto_exposure !== undefined) {
+      const isAuto = s.auto_exposure === true;
+      autoExposureToggle.classList.toggle('on', isAuto);
+      exposureSlider.disabled = isAuto;
     }
-  } catch(e) {}
+    if (s.exposure !== undefined) {
+      exposureSlider.value = s.exposure;
+      exposureVal.textContent = s.exposure;
+    }
+    if (s.gain !== undefined) {
+      gainSlider.value = s.gain;
+      gainVal.textContent = s.gain;
+    }
+    if (s.auto_wb !== undefined) {
+      const isAutoWb = s.auto_wb === true;
+      autoWbToggle.classList.toggle('on', isAutoWb);
+      wbSlider.disabled = isAutoWb;
+    }
+    if (s.wb_temperature !== undefined) {
+      wbSlider.value = s.wb_temperature;
+      wbVal.textContent = s.wb_temperature;
+    }
+
+    if (r.auto_exposure === 'unsupported') {
+      document.getElementById('autoExposureNote').textContent = "driver doesn't report state";
+      exposureSlider.disabled = false;
+    }
+    if (r.auto_wb === 'unsupported') {
+      document.getElementById('autoWbNote').textContent = "driver doesn't report state";
+      wbSlider.disabled = false;
+    }
+  } catch(e) {
+    console.error("Failed to load camera settings:", e);
+  }
 }
 initCameraSettingsUI();
 
@@ -1941,30 +1946,36 @@ autoExposureToggle.addEventListener('click', () => {
   const isAuto = !autoExposureToggle.classList.contains('on');
   autoExposureToggle.classList.toggle('on', isAuto);
   exposureSlider.disabled = isAuto;
-  updateCameraSettings({ auto_exposure: isAuto });
+  updateCameraSettings({ auto_exposure: isAuto, exposure: parseFloat(exposureSlider.value) });
+});
+
+exposureSlider.addEventListener('input', () => {
+  exposureVal.textContent = exposureSlider.value;
 });
 exposureSlider.addEventListener('change', () => {
-  const isAuto = autoExposureToggle.classList.contains('on');
-  updateCameraSettings({ exposure: parseFloat(exposureSlider.value), auto_exposure: isAuto });
+  updateCameraSettings({ exposure: parseFloat(exposureSlider.value), auto_exposure: false });
 });
-exposureSlider.addEventListener('input', () => { exposureVal.textContent = exposureSlider.value; });
 
+gainSlider.addEventListener('input', () => {
+  gainVal.textContent = gainSlider.value;
+});
 gainSlider.addEventListener('change', () => {
   updateCameraSettings({ gain: parseFloat(gainSlider.value) });
 });
-gainSlider.addEventListener('input', () => { gainVal.textContent = gainSlider.value; });
 
 autoWbToggle.addEventListener('click', () => {
   const isAuto = !autoWbToggle.classList.contains('on');
   autoWbToggle.classList.toggle('on', isAuto);
   wbSlider.disabled = isAuto;
-  updateCameraSettings({ auto_wb: isAuto });
+  updateCameraSettings({ auto_wb: isAuto, wb_temperature: parseFloat(wbSlider.value) });
+});
+
+wbSlider.addEventListener('input', () => {
+  wbVal.textContent = wbSlider.value;
 });
 wbSlider.addEventListener('change', () => {
-  const isAuto = autoWbToggle.classList.contains('on');
-  updateCameraSettings({ wb_temperature: parseFloat(wbSlider.value), auto_wb: isAuto });
+  updateCameraSettings({ wb_temperature: parseFloat(wbSlider.value), auto_wb: false });
 });
-wbSlider.addEventListener('input', () => { wbVal.textContent = wbSlider.value; });
 
 // Camera scanning and switching
 const cameraIndexSelect = document.getElementById('cameraIndexSelect');

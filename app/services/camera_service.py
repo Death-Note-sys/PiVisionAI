@@ -38,3 +38,20 @@ class CameraService:
             logger.error(f"Failed to switch camera: {e}")
             return False
 
+    def get_camera_settings(self) -> Dict[str, Any]:
+        """Get current camera hardware settings and readback."""
+        if hasattr(self.camera_manager, "get_settings"):
+            return self.camera_manager.get_settings()
+        return {
+            "settings": getattr(self.camera_manager, "camera_settings", {}),
+            "readback": getattr(self.camera_manager, "last_readback", {})
+        }
+
+    def update_camera_settings(self, settings: Dict[str, Any]) -> Dict[str, Any]:
+        """Update camera hardware settings and return applied settings & readback."""
+        readback = self.camera_manager.apply_settings(settings)
+        return {
+            "settings": getattr(self.camera_manager, "camera_settings", {}),
+            "readback": readback
+        }
+

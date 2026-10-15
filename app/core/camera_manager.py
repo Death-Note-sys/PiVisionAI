@@ -39,52 +39,106 @@ class CameraManager:
         self._capture_thread = None
         self._processing_thread = None
         self._cap_lock = threading.Lock()
-        self.camera_settings = {}
+        self.camera_settings = {
+            "auto_exposure": True,
+            "exposure": -5.0,
+            "gain": 0.0,
+            "auto_wb": True,
+            "wb_temperature": 4600.0
+        }
         self.last_readback = {}
         
     def apply_settings(self, settings: Dict[str, Any]) -> Dict[str, Any]:
         """Apply camera settings and return read-back values."""
         self.camera_settings.update(settings)
         if not self.cap or not self.is_connected:
-            return {}
+            return dict(settings)
             
         readback = {}
         with self._cap_lock:
             # Auto Exposure
             if "auto_exposure" in settings:
-                # DSHOW: 0.25 manual, 0.75 auto
-                val = 0.75 if settings["auto_exposure"] else 0.25
-                self.cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, val)
-                actual = self.cap.get(cv2.CAP_PROP_AUTO_EXPOSURE)
-                readback["auto_exposure"] = "unsupported" if actual < 0 else (actual > 0.5)
+                is_auto = bool(settings["auto_exposure"])
+                val = 0.75 if is_auto else 0.25
+                try:
+                    self.cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, val)
+                    actual = self.cap.get(cv2.CAP_PROP_AUTO_EXPOSURE)
+                    if isinstance(actual, (int, float)):
+                        if actual < 0:
+                            self.cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 1.0 if is_auto else 0.0)
+                            actual = self.cap.get(cv2.CAP_PROP_AUTO_EXPOSURE)
+                        readback["auto_exposure"] = "unsupported" if (isinstance(actual, (int, float)) and actual < 0) else (bool(actual > 0.5) if isinstance(actual, (int, float)) else is_auto)
+                    else:
+                        readback["auto_exposure"] = is_auto
+                except Exception as e:
+                    logger.warning(f"Error setting auto_exposure: {e}")
+                    readback["auto_exposure"] = is_auto
                 
-            if "exposure" in settings and not settings.get("auto_exposure", True):
-                self.cap.set(cv2.CAP_PROP_EXPOSURE, settings["exposure"])
-                readback["exposure"] = self.cap.get(cv2.CAP_PROP_EXPOSURE)
+            is_auto_exp = self.camera_settings.get("auto_exposure", True)
+            if "exposure" in settings and not is_auto_exp:
+                try:
+                    self.cap.set(cv2.CAP_PROP_EXPOSURE, float(settings["exposure"]))
+                    actual_exp = self.cap.get(cv2.CAP_PROP_EXPOSURE)
+                    readback["exposure"] = actual_exp if isinstance(actual_exp, (int, float)) and actual_exp >= -100 else float(settings["exposure"])
+                except Exception as e:
+                    logger.warning(f"Error setting exposure: {e}")
                 
             if "gain" in settings:
-                self.cap.set(cv2.CAP_PROP_GAIN, settings["gain"])
-                readback["gain"] = self.cap.get(cv2.CAP_PROP_GAIN)
+                try:
+                    self.cap.set(cv2.CAP_PROP_GAIN, float(settings["gain"]))
+                    actual_gain = self.cap.get(cv2.CAP_PROP_GAIN)
+                    readback["gain"] = actual_gain if isinstance(actual_gain, (int, float)) and actual_gain >= 0 else float(settings["gain"])
+                except Exception as e:
+                    logger.warning(f"Error setting gain: {e}")
                 
             if "auto_wb" in settings:
-                self.cap.set(cv2.CAP_PROP_AUTO_WB, 1.0 if settings["auto_wb"] else 0.0)
-                actual_wb = self.cap.get(cv2.CAP_PROP_AUTO_WB)
-                readback["auto_wb"] = "unsupported" if actual_wb < 0 else (actual_wb > 0.5)
+                is_auto_wb = bool(settings["auto_wb"])
+                try:
+                    self.cap.set(cv2.CAP_PROP_AUTO_WB, 1.0 if is_auto_wb else 0.0)
+                    actual_wb = self.cap.get(cv2.CAP_PROP_AUTO_WB)
+                    if isinstance(actual_wb, (int, float)):
+                        readback["auto_wb"] = "unsupported" if actual_wb < 0 else bool(actual_wb > 0.5)
+                    else:
+                        readback["auto_wb"] = is_auto_wb
+                except Exception as e:
+                    logger.warning(f"Error setting auto_wb: {e}")
+                    readback["auto_wb"] = is_auto_wb
                 
-            if "wb_temperature" in settings and not settings.get("auto_wb", True):
-                self.cap.set(cv2.CAP_PROP_WB_TEMPERATURE, settings["wb_temperature"])
-                readback["wb_temperature"] = self.cap.get(cv2.CAP_PROP_WB_TEMPERATURE)
+            is_auto_wb = self.camera_settings.get("auto_wb", True)
+            if "wb_temperature" in settings and not is_auto_wb:
+                try:
+                    self.cap.set(cv2.CAP_PROP_WB_TEMPERATURE, float(settings["wb_temperature"]))
+                    actual_wb_t = self.cap.get(cv2.CAP_PROP_WB_TEMPERATURE)
+                    readback["wb_temperature"] = actual_wb_t if isinstance(actual_wb_t, (int, float)) and actual_wb_t > 0 else float(settings["wb_temperature"])
+                except Exception as e:
+                    logger.warning(f"Error setting wb_temperature: {e}")
                 
             if "autofocus" in settings:
-                self.cap.set(cv2.CAP_PROP_AUTOFOCUS, 1.0 if settings["autofocus"] else 0.0)
-                readback["autofocus"] = self.cap.get(cv2.CAP_PROP_AUTOFOCUS) > 0.5
+                try:
+                    self.cap.set(cv2.CAP_PROP_AUTOFOCUS, 1.0 if settings["autofocus"] else 0.0)
+                    actual_af = self.cap.get(cv2.CAP_PROP_AUTOFOCUS)
+                    readback["autofocus"] = bool(actual_af > 0.5) if isinstance(actual_af, (int, float)) else bool(settings["autofocus"])
+                except Exception as e:
+                    logger.warning(f"Error setting autofocus: {e}")
                 
-            if "focus" in settings and not settings.get("autofocus", True):
-                self.cap.set(cv2.CAP_PROP_FOCUS, settings["focus"])
-                readback["focus"] = self.cap.get(cv2.CAP_PROP_FOCUS)
+            is_autofocus = self.camera_settings.get("autofocus", True)
+            if "focus" in settings and not is_autofocus:
+                try:
+                    self.cap.set(cv2.CAP_PROP_FOCUS, float(settings["focus"]))
+                    actual_f = self.cap.get(cv2.CAP_PROP_FOCUS)
+                    readback["focus"] = actual_f if isinstance(actual_f, (int, float)) else float(settings["focus"])
+                except Exception as e:
+                    logger.warning(f"Error setting focus: {e}")
                 
         self.last_readback.update(readback)
         return readback
+
+    def get_settings(self) -> Dict[str, Any]:
+        """Return current camera settings and latest driver readback."""
+        return {
+            "settings": dict(self.camera_settings),
+            "readback": dict(self.last_readback)
+        }
 
     def start(self):
         """Start the capture and processing threads."""

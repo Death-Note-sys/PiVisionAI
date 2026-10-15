@@ -103,5 +103,9 @@ def handle_camera_settings():
         data = request.get_json()
         if not data:
             return jsonify({"error": "No JSON payload provided"}), 400
-        updated = camera_service.update_camera_settings(data)
-        return jsonify({"success": True, "settings": updated})
+        result = camera_service.update_camera_settings(data)
+        return jsonify({
+            "success": True,
+            "settings": result.get("settings", {}),
+            "readback": result.get("readback", {})
+        })
