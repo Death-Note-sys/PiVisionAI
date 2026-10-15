@@ -1,3 +1,5 @@
+import os
+from pathlib import Path
 import cv2
 import numpy as np
 import time
@@ -23,12 +25,24 @@ class ColorAnalysisController(BaseModuleController):
         # Load settings
         saved_settings = self.load_settings()
         if saved_settings:
+            norm_path = os.path.normpath(os.path.abspath(self.settings_file))
+            is_scratch = any(part.lower() == "scratch" for part in Path(norm_path).parts)
+
             version = saved_settings.get("version", 0)
-            if version < 1:
-                logger.warning(f"ColorAnalysis: Migrating unversioned settings file {self.settings_file} to version 1")
-                if saved_settings.get("delta_e_threshold") == 30.5 or "version" not in saved_settings:
-                    if saved_settings.get("delta_e_threshold") == 30.5:
-                        saved_settings["delta_e_threshold"] = 25.0
+            if version < 1 and not is_scratch:
+                old_thresh = saved_settings.get("delta_e_threshold")
+                if old_thresh == 30.5:
+                    new_thresh = 25.0
+                    saved_settings["delta_e_threshold"] = new_thresh
+                    logger.warning(
+                        f"ColorAnalysis: Migrated settings file {self.settings_file} "
+                        f"(delta_e_threshold: {old_thresh} -> {new_thresh}, version: {version} -> 1)"
+                    )
+                else:
+                    logger.warning(
+                        f"ColorAnalysis: Migrated settings file {self.settings_file} "
+                        f"(delta_e_threshold kept custom: {old_thresh}, version: {version} -> 1)"
+                    )
                 saved_settings["version"] = 1
                 self.save_settings(saved_settings)
             self.settings.update(saved_settings)
