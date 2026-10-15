@@ -29,6 +29,20 @@ class OCRController(BaseModuleController):
         return True
 
     def configure(self, settings: Dict[str, Any]) -> bool:
+        current = self.settings.get_settings()
+        merged_judge = settings["judge_enabled"] if "judge_enabled" in settings else current.get("judge_enabled", False)
+        merged_pattern = settings["expected_pattern"] if "expected_pattern" in settings else current.get("expected_pattern", "")
+
+        if merged_judge:
+            if not merged_pattern or not str(merged_pattern).strip():
+                logger.error("OCR configure failed: expected_pattern cannot be empty when judge_enabled is True.")
+                return False
+            try:
+                re.compile(merged_pattern)
+            except re.error as e:
+                logger.error(f"OCR configure failed: invalid regex pattern '{merged_pattern}': {e}")
+                return False
+
         if self.settings.update(settings):
             if "model_id" in settings:
                 self.active_model_id = settings["model_id"]

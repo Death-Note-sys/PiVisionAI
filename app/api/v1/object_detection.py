@@ -73,7 +73,21 @@ def update_settings():
     except ValidationError as e:
         return jsonify({"error": e.errors()}), 400
 
-    if od_service.update_settings(validated.to_update_dict()):
+    update_dict = validated.to_update_dict()
+    current = {}
+    if hasattr(od_service, "settings") and hasattr(od_service.settings, "get_settings"):
+        res = od_service.settings.get_settings()
+        if isinstance(res, dict):
+            current = res
+
+    merged_cmin = update_dict.get("count_min", current.get("count_min", 0))
+    merged_cmax = update_dict.get("count_max", current.get("count_max", 0))
+    if (merged_cmin is not None and merged_cmin < 0) or (merged_cmax is not None and merged_cmax < 0):
+        return jsonify({"error": "count_min and count_max must be >= 0"}), 400
+    if merged_cmax > 0 and merged_cmin > merged_cmax:
+        return jsonify({"error": "count_min cannot be greater than count_max"}), 400
+
+    if od_service.update_settings(update_dict):
         return jsonify({"success": True})
     return jsonify({"error": "Failed to update settings"}), 500
 

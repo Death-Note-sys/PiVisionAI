@@ -70,6 +70,8 @@ def test_per_module_settings_survive_new_controller_instance():
 def test_measurement_calibration_persists_and_resets():
     # --- isolation: remove any leftover calibration data from other tests ---
     from app.core.container import Container
+    if Container._instance is None or not hasattr(Container._instance, "session_manager"):
+        Container._instance = None
     _container = Container.get_instance()
     _meas_dir = _container.session_manager.get_data_dir("modules/core-measurement")
     _data_json = os.path.join(_meas_dir, "data.json")
@@ -103,6 +105,8 @@ def test_measurement_legacy_pixels_per_cm_migration():
     bus = EventBus()
     # Write a legacy data.json with pixels_per_cm
     from app.core.container import Container
+    if Container._instance is None or not hasattr(Container._instance, "session_manager"):
+        Container._instance = None
     container = Container.get_instance()
     meas_dir = container.session_manager.get_data_dir("modules/core-measurement")
     os.makedirs(meas_dir, exist_ok=True)

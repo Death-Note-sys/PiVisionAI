@@ -73,3 +73,27 @@ def test_settings_accepts_valid_pattern_and_judge_enabled(client, mock_ocr_servi
     assert response.status_code == 200
     mock_ocr_service.update_settings.assert_called_once_with(payload)
 
+
+def test_settings_rejects_empty_pattern_when_judge_enabled(client, mock_ocr_service):
+    mock_ocr_service.settings.get_settings.return_value = {"expected_pattern": "", "judge_enabled": False}
+    response = client.post("/api/v1/ocr/settings", json={"expected_pattern": "", "judge_enabled": True})
+
+    assert response.status_code == 400
+    mock_ocr_service.update_settings.assert_not_called()
+
+
+def test_settings_rejects_judge_enabled_when_pattern_currently_empty(client, mock_ocr_service):
+    mock_ocr_service.settings.get_settings.return_value = {"expected_pattern": "", "judge_enabled": False}
+    response = client.post("/api/v1/ocr/settings", json={"judge_enabled": True})
+
+    assert response.status_code == 400
+    mock_ocr_service.update_settings.assert_not_called()
+
+
+def test_settings_rejects_clearing_pattern_while_judge_enabled(client, mock_ocr_service):
+    mock_ocr_service.settings.get_settings.return_value = {"expected_pattern": "^[0-9]+$", "judge_enabled": True}
+    response = client.post("/api/v1/ocr/settings", json={"expected_pattern": ""})
+
+    assert response.status_code == 400
+    mock_ocr_service.update_settings.assert_not_called()
+

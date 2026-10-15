@@ -67,7 +67,20 @@ def update_settings():
         validated = UpdateOCRSettingsRequest(**data)
     except ValidationError as e:
         return jsonify({"error": e.errors()}), 400
-    if ocr_service.update_settings(validated.to_update_dict()):
+    update_dict = validated.to_update_dict()
+    current = {}
+    if hasattr(ocr_service, "settings") and hasattr(ocr_service.settings, "get_settings"):
+        res = ocr_service.settings.get_settings()
+        if isinstance(res, dict):
+            current = res
+
+    merged_judge = update_dict["judge_enabled"] if "judge_enabled" in update_dict else current.get("judge_enabled", False)
+    merged_pattern = update_dict["expected_pattern"] if "expected_pattern" in update_dict else current.get("expected_pattern", "")
+
+    if merged_judge and (not merged_pattern or not str(merged_pattern).strip()):
+        return jsonify({"error": "expected_pattern cannot be empty when judge_enabled is True"}), 400
+
+    if ocr_service.update_settings(update_dict):
         return jsonify({"success": True})
     return jsonify({"error": "Failed to update settings"}), 500
 

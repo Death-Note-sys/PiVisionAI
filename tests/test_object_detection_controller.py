@@ -91,3 +91,24 @@ def test_cleanup_unloads_active_model(controller):
 
 def test_health_check_returns_true(controller):
     assert controller.health_check() is True
+
+
+def test_configure_rejects_count_min_greater_than_max(controller):
+    assert controller.configure({"count_min": 5, "count_max": 2}) is False
+
+
+def test_process_judge_expect_none(controller):
+    controller.configure({"judge_enabled": True, "count_min": 0, "count_max": 0})
+    
+    # 0 detections -> is_ok should be True
+    controller.ai_runtime.predict.return_value = {"detections": [], "latency_ms": 5.0}
+    res0 = controller.process({"frame": MagicMock()})
+    assert res0.is_ok is True
+
+    # 1 detection -> is_ok should be False
+    controller.ai_runtime.predict.return_value = {
+        "detections": [{"box": [0, 0, 10, 10], "confidence": 0.9, "class_id": 0, "label": "item"}],
+        "latency_ms": 5.0
+    }
+    res1 = controller.process({"frame": MagicMock()})
+    assert res1.is_ok is False

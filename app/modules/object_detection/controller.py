@@ -30,6 +30,15 @@ class ObjectDetectionController(BaseModuleController):
         return True
         
     def configure(self, settings: Dict[str, Any]) -> bool:
+        current = self.settings.get_settings()
+        merged_cmin = settings.get("count_min", current.get("count_min", 0))
+        merged_cmax = settings.get("count_max", current.get("count_max", 0))
+        if (merged_cmin is not None and merged_cmin < 0) or (merged_cmax is not None and merged_cmax < 0):
+            logger.error("Object Detection configure failed: count_min and count_max must be >= 0.")
+            return False
+        if merged_cmax > 0 and merged_cmin > merged_cmax:
+            logger.error("Object Detection configure failed: count_min cannot be greater than count_max.")
+            return False
         if self.settings.update(settings):
             if "model_id" in settings:
                 self.active_model_id = settings["model_id"]

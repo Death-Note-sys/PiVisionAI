@@ -83,3 +83,20 @@ def test_configure_updates_settings_and_model_id(controller):
 def test_cleanup_unloads_active_model(controller):
     controller.cleanup()
     controller.ai_runtime.unload_model.assert_called_once_with(controller.active_model_id)
+
+
+def test_configure_rejects_empty_pattern_when_judge_enabled(controller):
+    assert controller.configure({"expected_pattern": "", "judge_enabled": True}) is False
+
+
+def test_configure_rejects_enabling_judge_when_pattern_empty(controller):
+    controller.settings.update({"expected_pattern": "", "judge_enabled": False})
+    assert controller.configure({"judge_enabled": True}) is False
+
+
+def test_configure_accepts_valid_pattern_and_judge_enabled(controller):
+    assert controller.configure({"expected_pattern": "^ID-[0-9]+$", "judge_enabled": True}) is True
+    assert controller.settings.get_settings()["judge_enabled"] is True
+
+    # clearing pattern while judging remains enabled should be rejected
+    assert controller.configure({"expected_pattern": ""}) is False

@@ -97,3 +97,11 @@ def test_update_settings_accepts_judge_enabled_and_counts(client, mock_od_servic
     assert response.status_code == 200
     mock_od_service.update_settings.assert_called_once_with(payload)
 
+
+def test_update_settings_rejects_count_min_greater_than_max(client, mock_od_service):
+    mock_od_service.settings.get_settings.return_value = {"count_min": 0, "count_max": 0}
+    response = client.post("/api/v1/object-detection/settings", json={"count_min": 5, "count_max": 2})
+
+    assert response.status_code == 400
+    mock_od_service.update_settings.assert_not_called()
+
