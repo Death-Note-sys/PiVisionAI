@@ -98,5 +98,5 @@ A PLC should:
 Counters are **not** reset over Modbus by default. Counter reset is **opt-in** and
 must be explicitly enabled via the application configuration (`counter_reset_enabled`,
 default `false`). This prevents accidental resets from a PLC write collision.
-To reset counters, use the web UI or the REST API (`POST /api/v1/system/reset_counters`).
+To reset counters, use the web UI or the REST API (`POST /api/v1/inspection/reset`).
 
