@@ -14,6 +14,7 @@ from .v1.measurement import bp as measurement_bp
 from .v1.ocr import bp as ocr_bp
 from .v1.ai_identify import bp as ai_identify_bp
 from .v1.color_analysis import bp as color_analysis_bp
+from .v1.object_counting import bp as object_counting_bp
 from .v1.trigger import bp as trigger_bp
 from .v1.inspection import bp as inspection_bp
 
@@ -47,6 +48,7 @@ def create_app() -> Flask:
     app.register_blueprint(ocr_bp)
     app.register_blueprint(ai_identify_bp)
     app.register_blueprint(color_analysis_bp)
+    app.register_blueprint(object_counting_bp)
     app.register_blueprint(trigger_bp)
     app.register_blueprint(inspection_bp)
     
@@ -55,6 +57,7 @@ def create_app() -> Flask:
     limiter.exempt(ocr_bp)
     limiter.exempt(ai_identify_bp)
     limiter.exempt(color_analysis_bp)
+    limiter.exempt(object_counting_bp)
     limiter.exempt(trigger_bp)
     
     @app.route('/')

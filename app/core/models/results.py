@@ -52,6 +52,13 @@ class ColorResult(ModuleResult):
     delta_e: Optional[float] = None
     match: Optional[bool] = None
 
+class ObjectCountingResult(ModuleResult):
+    """Standardized result for Similar Object Counting."""
+    template_status: str = "Untaught"  # "Untaught" | "Taught"
+    count: int = 0
+    matches: List[Dict[str, Any]] = Field(default_factory=list)  # [{x,y,w,h,score}]
+    is_ok: Optional[bool] = None
+
 class PoseResult(ModuleResult):
     """Standardized result for Pose Estimation."""
     poses: List[Dict[str, Any]] = Field(default_factory=list) # Landmarks
