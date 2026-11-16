@@ -18,8 +18,6 @@ A modular, browser-based computer vision platform built on **Flask + OpenCV**. A
 | **Barcode / QR** | pyzbar scan with live decode readout |
 | **Color Detector** | Dominant color extraction and classification |
 | **Edge Detection** | Canny edge overlay |
-| **Shape Detection** | Contour-based geometric shape recognition |
-| **Motion Detection** | Frame-diff motion alerting |
 | **Background Removal** | Real-time background segmentation |
 
 All modules share a single live video stream and are hot-swappable at runtime through the UI.
@@ -272,7 +270,6 @@ This is an active personal project under continuous development. Modules vary in
 | Face Detection | ⚙️ Working |
 | Barcode / QR | ⚙️ Working |
 | Color Detector | ⚙️ Working |
-| Edge / Shape / Motion | 🔧 Beta |
 | Background Removal | 🔧 Beta |
 
 ### AI Identify — Validation Detail

@@ -52,15 +52,6 @@ class ColorResult(ModuleResult):
     delta_e: Optional[float] = None
     match: Optional[bool] = None
 
-class MotionResult(ModuleResult):
-    """Standardized result for Motion Detection."""
-    motion_areas: List[Dict[str, Any]] = Field(default_factory=list)
-    global_motion_score: float = 0.0
-
-class ShapeResult(ModuleResult):
-    """Standardized result for Shape Detection."""
-    shapes: List[Dict[str, Any]] = Field(default_factory=list)
-
 class PoseResult(ModuleResult):
     """Standardized result for Pose Estimation."""
     poses: List[Dict[str, Any]] = Field(default_factory=list) # Landmarks
