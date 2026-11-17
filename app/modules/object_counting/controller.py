@@ -47,6 +47,8 @@ class ObjectCountingController(BaseModuleController):
         # Template state
         self.template_status: str = "Untaught"
         self.template_bgr: Optional[np.ndarray] = None
+        self.taught_frame_width: Optional[int] = None
+        self.taught_frame_height: Optional[int] = None
         self.last_teach_error: Optional[str] = None
 
         # Load persisted template image if previously taught
@@ -56,9 +58,13 @@ class ObjectCountingController(BaseModuleController):
             if img is not None:
                 self.template_bgr = img
                 self.template_status = "Taught"
+                self.taught_frame_width = saved_data.get("frame_width")
+                self.taught_frame_height = saved_data.get("frame_height")
             else:
                 logger.warning("ObjectCountingController: data.json says Taught but template.png missing; resetting.")
                 self.template_status = "Untaught"
+                self.taught_frame_width = None
+                self.taught_frame_height = None
 
         self.last_frame: Optional[np.ndarray] = None
         self.last_result: ObjectCountingResult = ObjectCountingResult()
@@ -124,7 +130,7 @@ class ObjectCountingController(BaseModuleController):
         """
         with self._lock:
             if self.last_frame is None:
-                self.last_teach_error = "No frame available yet — start the stream first."
+                self.last_teach_error = "No frame available yet - start the stream first."
                 logger.error(self.last_teach_error)
                 return False
             frame = self.last_frame.copy()
@@ -169,18 +175,26 @@ class ObjectCountingController(BaseModuleController):
         with self._lock:
             self.template_bgr = crop
             self.template_status = "Taught"
+            self.taught_frame_width = fw
+            self.taught_frame_height = fh
             self.last_teach_error = None
 
-        self.save_data({"template_status": "Taught"})
+        self.save_data({
+            "template_status": "Taught",
+            "frame_width": fw,
+            "frame_height": fh,
+        })
         self.event_bus.publish("ObjectCountingTemplateTaught", {"w": crop.shape[1], "h": crop.shape[0]})
         return True
 
     def reset_template(self) -> bool:
         """Clear the in-memory template and the persisted file.
-        Counters are NOT touched — that is coordinator/state-store territory."""
+        Counters are NOT touched - that is coordinator/state-store territory."""
         with self._lock:
             self.template_bgr = None
             self.template_status = "Untaught"
+            self.taught_frame_width = None
+            self.taught_frame_height = None
             self.last_teach_error = None
 
         self.save_data({"template_status": "Untaught"})
@@ -216,19 +230,43 @@ class ObjectCountingController(BaseModuleController):
         with self._lock:
             tmpl = self.template_bgr
             tpl_status = self.template_status
+            taught_w = self.taught_frame_width
+            taught_h = self.taught_frame_height
 
         if tpl_status != "Taught" or tmpl is None:
             # Untaught: count = 0, no judgment (or NG "not configured" if judging on)
             is_ok: Optional[bool] = None
             reason: Optional[str] = None
             if judge_enabled:
-                is_ok = False  # NG — not configured
+                is_ok = False  # NG - not configured
                 reason = "not configured"
             result = ObjectCountingResult(
                 template_status="Untaught",
                 count=0,
                 matches=[],
                 is_ok=is_ok,
+                reason=reason,
+                custom_metadata={"reason": reason} if reason else {},
+                latency_ms=(time.perf_counter() - start) * 1000,
+                timestamp=time.time(),
+            )
+            self.last_result = result
+            return result
+
+        # Resolution safety check: if taught size is known and live frame size differs, flag re-teach
+        fh, fw = frame.shape[:2]
+        if taught_w is not None and taught_h is not None and (fw != taught_w or fh != taught_h):
+            is_ok = False if judge_enabled else None
+            reason = (
+                f"template taught at {taught_w}x{taught_h}, frame is {fw}x{fh}"
+                if judge_enabled else None
+            )
+            result = ObjectCountingResult(
+                template_status="Re-teach (resolution changed)",
+                count=0,
+                matches=[],
+                is_ok=is_ok,
+                reason=reason,
                 custom_metadata={"reason": reason} if reason else {},
                 latency_ms=(time.perf_counter() - start) * 1000,
                 timestamp=time.time(),
@@ -280,6 +318,7 @@ class ObjectCountingController(BaseModuleController):
             count=count,
             matches=matches_serialized,
             is_ok=is_ok,
+            reason=reason,
             custom_metadata={"reason": reason} if reason else {},
             latency_ms=(time.perf_counter() - start) * 1000,
             timestamp=time.time(),

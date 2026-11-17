@@ -137,3 +137,26 @@ def test_object_counting_pipeline_single_vs_continuous_trigger():
         assert cur.fetchone()[0] == 1
 
     assert state_store.total_count == 1
+
+    # ---------------------------------------------------------
+    # 5. Fire trigger with count_min = count_max = 9 (8 objects present) -> logs NG with "count 8"
+    # ---------------------------------------------------------
+    controller.configure({"judge_enabled": True, "count_min": 9, "count_max": 9})
+    pipeline.fire_trigger()
+    pipeline.process_frame(scene)
+
+    with sqlite3.connect(db_path) as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT judgment, reason FROM inspections WHERE module_id = 'core-object-counting' ORDER BY id DESC LIMIT 1")
+        row = cur.fetchone()
+        assert row is not None
+        judgment, reason = row
+        assert judgment == "NG"
+        assert "count 8" in reason
+
+    assert state_store.total_count == 2
+    assert state_store.ok_count == 1
+    assert state_store.ng_count == 1
+    per_module = state_store.get_counters("core-object-counting")
+    assert per_module["ng_count"] == 1
+    assert per_module["total_count"] == 2

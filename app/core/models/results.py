@@ -58,6 +58,7 @@ class ObjectCountingResult(ModuleResult):
     count: int = 0
     matches: List[Dict[str, Any]] = Field(default_factory=list)  # [{x,y,w,h,score}]
     is_ok: Optional[bool] = None
+    reason: Optional[str] = None
 
 class PoseResult(ModuleResult):
     """Standardized result for Pose Estimation."""

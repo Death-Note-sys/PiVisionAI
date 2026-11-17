@@ -229,3 +229,77 @@ def test_max_objects_cap(clean_counting_data):
     controller.configure({"max_objects": 3})
     res = controller.process({"frame": scene})
     assert res.count == 3
+
+
+def test_resolution_safety_same_size_counts(clean_counting_data):
+    bus = EventBus()
+    settings = ObjectCountingSettings()
+    controller = ObjectCountingController(bus, settings)
+
+    template = make_template(size=32, seed=7)
+    scene = make_scene(template, POSITIONS, shape=(240, 320))
+
+    controller.on_raw_frame(scene)
+    assert controller.teach_template(10, 10, 32, 32) is True
+    assert controller.taught_frame_width == 320
+    assert controller.taught_frame_height == 240
+
+    # Same size frame counts normally
+    res = controller.process({"frame": scene})
+    assert res.count == len(POSITIONS)
+    assert res.template_status == "Taught"
+
+
+def test_resolution_safety_different_size_flags_reteach(clean_counting_data):
+    bus = EventBus()
+    settings = ObjectCountingSettings()
+    controller = ObjectCountingController(bus, settings)
+
+    template = make_template(size=32, seed=7)
+    scene = make_scene(template, POSITIONS, shape=(240, 320))
+
+    controller.on_raw_frame(scene)
+    assert controller.teach_template(10, 10, 32, 32) is True
+    assert controller.taught_frame_width == 320
+    assert controller.taught_frame_height == 240
+
+    # Live frame with different resolution (480x640)
+    different_frame = np.zeros((480, 640, 3), dtype=np.uint8)
+
+    # 1. Without judging
+    res_no_judge = controller.process({"frame": different_frame})
+    assert res_no_judge.count == 0
+    assert res_no_judge.template_status == "Re-teach (resolution changed)"
+    assert res_no_judge.is_ok is None
+
+    # 2. With judging enabled: returns NG with reason
+    controller.configure({"judge_enabled": True})
+    res_judged = controller.process({"frame": different_frame})
+    assert res_judged.count == 0
+    assert res_judged.template_status == "Re-teach (resolution changed)"
+    assert res_judged.is_ok is False
+    assert res_judged.reason == "template taught at 320x240, frame is 640x480"
+
+
+def test_resolution_safety_old_data_without_size_works(clean_counting_data):
+    import json
+    container = Container.get_instance()
+    mod_dir = container.session_manager.get_data_dir("modules/core-object-counting")
+
+    # Simulate an old data.json created before resolution tracking was added
+    template = make_template(size=32, seed=7)
+    cv2.imwrite(os.path.join(mod_dir, "template.png"), template)
+    with open(os.path.join(mod_dir, "data.json"), "w", encoding="utf-8") as f:
+        json.dump({"template_status": "Taught"}, f)
+
+    bus = EventBus()
+    controller = ObjectCountingController(bus, ObjectCountingSettings())
+
+    assert controller.template_status == "Taught"
+    assert controller.taught_frame_width is None
+    assert controller.taught_frame_height is None
+
+    scene = make_scene(template, POSITIONS, shape=(240, 320))
+    res = controller.process({"frame": scene})
+    assert res.count == len(POSITIONS)
+    assert res.template_status == "Taught"
