@@ -30,3 +30,7 @@ audit.txt
 scratch/
 data/
 *.log
+
+Ultralytics/
+*.pt
+models/
