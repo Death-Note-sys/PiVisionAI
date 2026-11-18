@@ -17,6 +17,7 @@ from .v1.color_analysis import bp as color_analysis_bp
 from .v1.object_counting import bp as object_counting_bp
 from .v1.trigger import bp as trigger_bp
 from .v1.inspection import bp as inspection_bp
+from .v1.target_extraction import bp as target_extraction_bp
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +52,7 @@ def create_app() -> Flask:
     app.register_blueprint(object_counting_bp)
     app.register_blueprint(trigger_bp)
     app.register_blueprint(inspection_bp)
+    app.register_blueprint(target_extraction_bp)
     
     limiter.exempt(object_detection_bp)
     limiter.exempt(measurement_bp)
@@ -59,6 +61,7 @@ def create_app() -> Flask:
     limiter.exempt(color_analysis_bp)
     limiter.exempt(object_counting_bp)
     limiter.exempt(trigger_bp)
+    limiter.exempt(target_extraction_bp)
     
     @app.route('/')
     def index():

@@ -71,3 +71,17 @@ class TrackingResult(ModuleResult):
 class SegmentationResult(ModuleResult):
     """Standardized result for Instance/Semantic Segmentation."""
     masks: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+class TargetExtractionResult(ModuleResult):
+    """Standardized result for AI Target Extraction."""
+    roi_status: str = "Untaught"           # "Untaught" | "Taught"
+    engine: Optional[str] = None           # "sam" | "grabcut" | None
+    fallback_reason: Optional[str] = None
+    area_px: int = 0
+    area_ratio: float = 0.0
+    bbox: Optional[Dict[str, Any]] = None
+    centroid: Optional[Dict[str, Any]] = None
+    roi: Optional[Dict[str, Any]] = None   # the ROI box {x,y,w,h}
+    is_ok: Optional[bool] = None
+    reason: Optional[str] = None

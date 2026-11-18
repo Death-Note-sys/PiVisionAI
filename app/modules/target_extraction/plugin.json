@@ -1,0 +1,32 @@
+{
+    "id": "core-target-extraction",
+    "name": "Target Extraction",
+    "version": "1.0.0",
+    "author": "Pi Vision AI Core",
+    "description": "AI Target Extraction: box-prompted SAM segmentation with GrabCut fallback, background removal around a taught ROI.",
+    "category": "Vision",
+    "task": "Target Extraction",
+    "entry_point": "plugin.py:TargetExtractionPlugin",
+    "renderer": "target_extraction",
+    "api_version": "v1",
+    "supported_camera_types": ["rgb"],
+    "supported_results": ["TargetExtractionResult"],
+    "required_models": [],
+    "required_backends": [],
+    "optional_backends": [],
+    "permissions": ["camera"],
+    "dependencies": ["opencv-python", "numpy"],
+    "minimum_framework_version": "1.0.0",
+    "license": "MIT",
+    "settings_schema": {
+        "engine": {"type": "string", "default": "auto"},
+        "sam_weights": {"type": "string", "default": "models/mobile_sam.pt"},
+        "grabcut_iterations": {"type": "integer", "default": 5},
+        "view_mode": {"type": "string", "default": "overlay"},
+        "show_info": {"type": "boolean", "default": true},
+        "thickness": {"type": "integer", "default": 2},
+        "judge_enabled": {"type": "boolean", "default": false},
+        "min_area_ratio": {"type": "float", "default": 0.10},
+        "max_area_ratio": {"type": "float", "default": 0.95}
+    }
+}

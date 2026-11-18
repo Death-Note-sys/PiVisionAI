@@ -9,6 +9,7 @@ from app.core.models.system import AIBackend
 from app.core.contracts import IAdapter
 from app.core.adapters.yolo_adapter import YoloAdapter
 from app.core.adapters.ocr_adapter import OcrAdapter
+from app.core.adapters.sam_adapter import SamAdapter
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +61,8 @@ class AIRuntimeManager:
             adapter = YoloAdapter()
         elif meta.framework == "easyocr":
             adapter = OcrAdapter()
+        elif meta.framework == "sam":
+            adapter = SamAdapter()
         else:
             logger.error(f"Unsupported framework: {meta.framework}")
             return False

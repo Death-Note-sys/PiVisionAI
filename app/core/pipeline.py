@@ -141,6 +141,7 @@ class Pipeline:
         start_e2e = time.perf_counter()
 
         should_process, triggered = self._should_process_frame()
+        context["triggered"] = triggered
 
         if not should_process:
             with self._trigger_lock:

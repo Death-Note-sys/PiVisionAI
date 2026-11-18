@@ -7,6 +7,7 @@ from app.core.renderers.ocr_renderer import OCRRenderer
 from app.core.renderers.ai_identify_renderer import AIIdentifyRenderer
 from app.core.renderers.color_analysis_renderer import ColorAnalysisRenderer
 from app.core.renderers.object_counting_renderer import ObjectCountingRenderer
+from app.core.renderers.target_extraction_renderer import TargetExtractionRenderer
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +26,7 @@ class RendererManager:
         self.renderers["ai_identify"] = AIIdentifyRenderer()
         self.renderers["color_analysis"] = ColorAnalysisRenderer()
         self.renderers["object_counting"] = ObjectCountingRenderer()
+        self.renderers["target_extraction"] = TargetExtractionRenderer()
         # Other renderers can be registered dynamically
         
     def switch_renderer(self, renderer_name: str) -> bool:
