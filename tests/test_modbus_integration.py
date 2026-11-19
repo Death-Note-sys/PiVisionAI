@@ -220,6 +220,8 @@ class TestModuleCodes:
         "core-ai-identify":      3,
         "core-ocr":              4,
         "core-color-analysis":   5,
+        "core-object-counting":  6,
+        "core-target-extraction": 7,
     }
 
     def test_module_code_literals(self):
@@ -247,6 +249,8 @@ class TestModuleCodes:
             "AI Identify":      "core-ai-identify",
             "OCR":              "core-ocr",
             "Color Analysis":   "core-color-analysis",
+            "Object Counting":  "core-object-counting",
+            "Target Extraction": "core-target-extraction",
         }
         for code_str, name in rows:
             mid = name_to_id.get(name.strip())
@@ -277,6 +281,36 @@ class TestModuleCodes:
         rr = client.read_holding_registers(0, 1)
         assert not rr.isError()
         assert rr.registers[0] == 3, f"Active Module ID: expected 3, got {rr.registers[0]}"
+
+    def test_active_module_register_object_counting(self, modbus_fixture):
+        client = modbus_fixture["client"]
+
+        # Set active module to Object Counting (code 6)
+        mock_meta = MagicMock()
+        mock_meta.id = "core-object-counting"
+        modbus_fixture["mock_container"].module_controller = MagicMock()
+        modbus_fixture["mock_container"].module_controller.active_metadata = mock_meta
+
+        time.sleep(0.3)
+
+        rr = client.read_holding_registers(0, 1)
+        assert not rr.isError()
+        assert rr.registers[0] == 6, f"Active Module ID: expected 6, got {rr.registers[0]}"
+
+    def test_active_module_register_target_extraction(self, modbus_fixture):
+        client = modbus_fixture["client"]
+
+        # Set active module to Target Extraction (code 7)
+        mock_meta = MagicMock()
+        mock_meta.id = "core-target-extraction"
+        modbus_fixture["mock_container"].module_controller = MagicMock()
+        modbus_fixture["mock_container"].module_controller.active_metadata = mock_meta
+
+        time.sleep(0.3)
+
+        rr = client.read_holding_registers(0, 1)
+        assert not rr.isError()
+        assert rr.registers[0] == 7, f"Active Module ID: expected 7, got {rr.registers[0]}"
 
 
 class TestPerModuleStatus:
@@ -353,6 +387,100 @@ class TestPerModuleStatus:
         rr = client.read_holding_registers(1, 1)
         assert not rr.isError()
         assert rr.registers[0] == 1, f"Color should still be OK (1), got {rr.registers[0]}"
+
+    def test_status_and_counters_object_counting(self, modbus_fixture):
+        """Object Counting (code 6): Idle -> OK and counters incremented."""
+        client = modbus_fixture["client"]
+        hw = modbus_fixture["hw"]
+
+        # Set active module
+        mock_meta = MagicMock()
+        mock_meta.id = "core-object-counting"
+        modbus_fixture["mock_container"].module_controller = MagicMock()
+        modbus_fixture["mock_container"].module_controller.active_metadata = mock_meta
+
+        time.sleep(0.3)
+
+        # Status should be 0 (Idle) - no inspection yet
+        rr = client.read_holding_registers(1, 1)
+        assert not rr.isError()
+        assert rr.registers[0] == 0, f"Expected Idle (0), got {rr.registers[0]}"
+
+        # Simulate triggered inspection with OK
+        result_mock = MagicMock()
+        result_mock.is_ok = True
+        del result_mock.match
+        del result_mock.classification
+        hw.state_store.increment_ok("core-object-counting")
+        hw._on_frame_processed({
+            "module_id": "core-object-counting",
+            "triggered": True,
+            "trigger_id": 201,
+            "result": result_mock,
+        })
+
+        time.sleep(0.3)
+
+        rr = client.read_holding_registers(1, 1)
+        assert not rr.isError()
+        assert rr.registers[0] == 1, f"Expected OK (1), got {rr.registers[0]}"
+
+        # Check per-module counters (HR2-7: Total, OK, NG)
+        rr_counts = client.read_holding_registers(2, 6)
+        assert not rr_counts.isError()
+        total = (rr_counts.registers[0] << 16) | rr_counts.registers[1]
+        ok = (rr_counts.registers[2] << 16) | rr_counts.registers[3]
+        ng = (rr_counts.registers[4] << 16) | rr_counts.registers[5]
+        assert total == 1
+        assert ok == 1
+        assert ng == 0
+
+    def test_status_and_counters_target_extraction(self, modbus_fixture):
+        """Target Extraction (code 7): Idle -> NG and counters incremented."""
+        client = modbus_fixture["client"]
+        hw = modbus_fixture["hw"]
+
+        # Set active module
+        mock_meta = MagicMock()
+        mock_meta.id = "core-target-extraction"
+        modbus_fixture["mock_container"].module_controller = MagicMock()
+        modbus_fixture["mock_container"].module_controller.active_metadata = mock_meta
+
+        time.sleep(0.3)
+
+        # Status should be 0 (Idle) - no inspection yet
+        rr = client.read_holding_registers(1, 1)
+        assert not rr.isError()
+        assert rr.registers[0] == 0, f"Expected Idle (0), got {rr.registers[0]}"
+
+        # Simulate triggered inspection with NG
+        result_mock = MagicMock()
+        result_mock.is_ok = False
+        del result_mock.match
+        del result_mock.classification
+        hw.state_store.increment_ng(module_id="core-target-extraction")
+        hw._on_frame_processed({
+            "module_id": "core-target-extraction",
+            "triggered": True,
+            "trigger_id": 202,
+            "result": result_mock,
+        })
+
+        time.sleep(0.3)
+
+        rr = client.read_holding_registers(1, 1)
+        assert not rr.isError()
+        assert rr.registers[0] == 2, f"Expected NG (2), got {rr.registers[0]}"
+
+        # Check per-module counters (HR2-7: Total, OK, NG)
+        rr_counts = client.read_holding_registers(2, 6)
+        assert not rr_counts.isError()
+        total = (rr_counts.registers[0] << 16) | rr_counts.registers[1]
+        ok = (rr_counts.registers[2] << 16) | rr_counts.registers[3]
+        ng = (rr_counts.registers[4] << 16) | rr_counts.registers[5]
+        assert total == 1
+        assert ok == 0
+        assert ng == 1
 
 
 class TestLastTriggerID:

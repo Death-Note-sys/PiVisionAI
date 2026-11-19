@@ -106,3 +106,31 @@ def test_hardware_frame_processed_event_handling():
         "result": res_good
     })
     assert hw._last_trigger_id == 102
+
+    # 4. is_ok True (Object Counting) -> status 1
+    res_counting = MagicMock()
+    res_counting.is_ok = True
+    del res_counting.match
+    del res_counting.classification
+    hw._on_frame_processed({
+        "module_id": "core-object-counting",
+        "triggered": True,
+        "trigger_id": 103,
+        "result": res_counting
+    })
+    assert hw._module_last_status.get("core-object-counting") == 1
+    assert hw._last_trigger_id == 103
+
+    # 5. is_ok False (Target Extraction) -> status 2
+    res_extraction = MagicMock()
+    res_extraction.is_ok = False
+    del res_extraction.match
+    del res_extraction.classification
+    hw._on_frame_processed({
+        "module_id": "core-target-extraction",
+        "triggered": True,
+        "trigger_id": 104,
+        "result": res_extraction
+    })
+    assert hw._module_last_status.get("core-target-extraction") == 2
+    assert hw._last_trigger_id == 104

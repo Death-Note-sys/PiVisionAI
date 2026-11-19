@@ -11,13 +11,15 @@ from app.core.state import StateStore
 
 logger = logging.getLogger(__name__)
 
-# Plan module codes: 1=Object Detection, 2=Measurement, 3=AI Identify, 4=OCR, 5=Color Analysis
+# Plan module codes: 1=Object Detection, 2=Measurement, 3=AI Identify, 4=OCR, 5=Color Analysis, 6=Object Counting, 7=Target Extraction
 MODULE_CODE_MAP = {
     "core-object-detection": 1,
     "core-measurement": 2,
     "core-ai-identify": 3,
     "core-ocr": 4,
     "core-color-analysis": 5,
+    "core-object-counting": 6,
+    "core-target-extraction": 7,
 }
 
 class HardwareManager:

@@ -32,7 +32,7 @@ The system runs a `ModbusTcpServer` on **port 5020** by default (configurable vi
 
 | Register | Address | Name | Type | R/W | Description |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| 40001 | 0 | Active Module ID | UInt16 | R | 1=Object Detection, 2=Measurement, 3=AI Identify, 4=OCR, 5=Color Analysis. 0=no module active. |
+| 40001 | 0 | Active Module ID | UInt16 | R | 1=Object Detection, 2=Measurement, 3=AI Identify, 4=OCR, 5=Color Analysis, 6=Object Counting, 7=Target Extraction. 0=no module active. |
 | 40002 | 1 | Overall Status | UInt16 | R | Per-module last judgment. **0=Idle** (no triggered inspection yet for this module since server start), **1=OK**, **2=NG**, **3=Uncertain (treat as reject — subset of NG)**. |
 | 40003–40004 | 2–3 | Total Count | UInt32 | R | Total triggered inspections (OK + NG). Big-endian: HR2=high word, HR3=low word. |
 | 40005–40006 | 4–5 | OK Count | UInt32 | R | Passed inspections. |
@@ -64,6 +64,8 @@ Both **Coil 0** and **HR9** are valid trigger inputs. The server consumes whiche
 | 3 | AI Identify |
 | 4 | OCR |
 | 5 | Color Analysis |
+| 6 | Object Counting |
+| 7 | Target Extraction |
 
 ---
 
