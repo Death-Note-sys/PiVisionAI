@@ -5,6 +5,7 @@ GrabCut really runs on the synthetic frames.
 """
 import os
 import json
+from pathlib import Path
 import numpy as np
 import pytest
 from unittest.mock import MagicMock
@@ -250,3 +251,35 @@ def test_judging_with_no_roi_returns_ng_not_configured(clean_te_data):
     assert result.roi_status == "Untaught"
     assert result.is_ok is False
     assert result.reason == "not configured"
+
+
+def test_cleanup_releases_segmenter(clean_te_data):
+    seg = _fake_segmenter()
+    ctrl = _controller(clean=False, segmenter=seg)
+    frame = _frame_with_fg()
+    ctrl.on_raw_frame(frame)
+    ctrl.set_roi(20, 20, 60, 50)
+    ctrl.process({"frame": frame, "triggered": True})
+    assert ctrl._segmenter_override is not None
+
+    ctrl.cleanup()
+    assert ctrl._lazy_segmenter is None
+    assert ctrl._segmenter_override is None
+    assert ctrl.last_frame is None
+
+
+def test_default_sam_weights_resolved_against_repo_root_from_other_cwd(clean_te_data, monkeypatch, tmp_path):
+    # Change working directory to a completely different directory
+    monkeypatch.chdir(tmp_path)
+    from app.modules.target_extraction.settings import TargetExtractionSettings, REPO_ROOT
+
+    settings = TargetExtractionSettings()
+    cfg = settings.get_settings()
+    weights_path = cfg["sam_weights"]
+
+    # Even from tmp_path, the path is absolute and resolves to the repo root's mobile_sam.pt
+    assert os.path.isabs(weights_path)
+    assert os.path.exists(weights_path)
+    assert Path(weights_path).name == "mobile_sam.pt"
+    assert str(REPO_ROOT) in weights_path
+

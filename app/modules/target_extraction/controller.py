@@ -14,7 +14,7 @@ from app.core.models.results import TargetExtractionResult
 from app.modules.target_extraction.extractor import (
     clamp_box, extract_target, mask_stats, judge_extraction, build_cutout,
 )
-from app.modules.target_extraction.settings import TargetExtractionSettings
+from app.modules.target_extraction.settings import TargetExtractionSettings, REPO_ROOT, _DEFAULT_SAM_WEIGHTS
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +93,10 @@ class TargetExtractionController(BaseModuleController):
         return False
 
     def cleanup(self) -> None:
+        with self._lock:
+            self._lazy_segmenter = None
+            self._segmenter_override = None
+            self.last_frame = None
         logger.info("TargetExtractionController cleaned up.")
 
     def health_check(self) -> bool:
@@ -163,7 +167,11 @@ class TargetExtractionController(BaseModuleController):
         if self._lazy_segmenter is None:
             try:
                 from app.modules.target_extraction.extractor import SamSegmenter
-                weights = s.get("sam_weights", "models/mobile_sam.pt")
+                weights = s.get("sam_weights", _DEFAULT_SAM_WEIGHTS)
+                if not os.path.isabs(weights):
+                    candidate = os.path.join(REPO_ROOT, weights)
+                    if os.path.exists(candidate):
+                        weights = candidate
                 self._lazy_segmenter = SamSegmenter(weights=weights)
             except Exception as exc:
                 logger.warning(f"Could not create SamSegmenter: {exc}")

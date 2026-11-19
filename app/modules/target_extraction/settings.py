@@ -1,12 +1,24 @@
 import os
+from pathlib import Path
 from typing import Dict, Any, Optional
 from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic_core import PydanticCustomError
 from app.core.contracts import ISettingsProvider
 
-_DEFAULT_SAM_WEIGHTS = (
-    "models/mobile_sam.pt" if os.path.exists("models/mobile_sam.pt") else "mobile_sam.pt"
-)
+REPO_ROOT = Path(__file__).resolve().parents[3]
+
+
+def _resolve_default_sam_weights() -> str:
+    models_sam = REPO_ROOT / "models" / "mobile_sam.pt"
+    if models_sam.is_file():
+        return str(models_sam)
+    root_sam = REPO_ROOT / "mobile_sam.pt"
+    if root_sam.is_file():
+        return str(root_sam)
+    return str(models_sam)
+
+
+_DEFAULT_SAM_WEIGHTS = _resolve_default_sam_weights()
 
 VALID_ENGINES = ("auto", "sam", "grabcut")
 VALID_VIEW_MODES = ("overlay", "cutout")
