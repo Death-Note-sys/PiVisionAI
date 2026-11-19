@@ -621,6 +621,8 @@
       <option value="core-ai-identify">AI Identify</option>
       <option value="core-ocr">OCR</option>
       <option value="core-color-analysis">Color Analysis</option>
+      <option value="core-object-counting">Object Counting</option>
+      <option value="core-target-extraction">Target Extraction</option>
     </select>
     <div class="toolbar-divider"></div>
     <select class="module-select" id="cameraIndexSelect" title="Camera source">
@@ -659,6 +661,8 @@
       <div class="tool-btn" data-module="core-ai-identify" title="AI Identify"><i class="ti ti-focus-2"></i></div>
       <div class="tool-btn" data-module="core-color-analysis" title="Color Analysis"><i class="ti ti-color-swatch"></i></div>
       <div class="tool-btn" data-module="core-ocr" title="OCR"><i class="ti ti-abc"></i></div>
+      <div class="tool-btn" data-module="core-object-counting" title="Object Counting"><i class="ti ti-123"></i></div>
+      <div class="tool-btn" data-module="core-target-extraction" title="Target Extraction"><i class="ti ti-wand"></i></div>
     </div>
 
     <div class="viewport-area">
@@ -826,8 +830,7 @@
       </div>
 
       <div class="inspector-section color-analysis-only hidden">
-        <p class="inspector-title">Color settings</p>
-        <div class="field">
+        <p class="inspector-title">Color settings</p>        <div class="field">
           <div class="field-label"><span>Number of colors</span><span class="field-value" id="numColorsVal">5</span></div>
           <input type="range" id="numColorsSlider" min="1" max="10" step="1" value="5">
         </div>
@@ -848,6 +851,130 @@
         </div>
         <button class="full-btn" id="setColorReferenceBtn"><i class="ti ti-eyedropper"></i> Set Reference Color</button>
         <button class="full-btn neutral" id="resetColorReferenceBtn" style="margin-top:6px;"><i class="ti ti-refresh"></i> Reset Reference</button>
+      </div>
+
+      <!-- ========== Object Counting ========== -->
+      <div class="inspector-section object-counting-only hidden">
+        <p class="inspector-title">Object Counting readout</p>
+        <div class="stat-row" style="align-items:center;gap:8px;">
+          <span class="label">COUNT</span>
+          <span class="value accent" id="ocStatCount" style="font-size:28px;font-family:var(--font-data);line-height:1;">—</span>
+        </div>
+        <div class="stat-row"><span class="label">Judgment</span><span class="value" id="ocStatJudgment">—</span></div>
+        <div class="stat-row"><span class="label">Template</span><span class="value" id="ocStatTemplateStatus">Untaught</span></div>
+        <div class="stat-row"><span class="label">Latency</span><span class="value" id="ocStatLatency">— ms</span></div>
+        <div class="stat-row"><span class="label">Mean score</span><span class="value" id="ocStatMeanScore">—</span></div>
+      </div>
+
+      <div class="inspector-section object-counting-only hidden">
+        <p class="inspector-title">Matching settings</p>
+        <div class="field">
+          <div class="field-label"><span>Match threshold</span><span class="field-value" id="ocMatchThresholdVal">0.70</span></div>
+          <input type="range" id="ocMatchThresholdSlider" min="0.30" max="0.99" step="0.01" value="0.70">
+        </div>
+        <div class="field">
+          <div class="field-label"><span>Duplicate suppression</span><span class="field-value" id="ocSuppressFracVal">0.50</span></div>
+          <input type="range" id="ocSuppressFracSlider" min="0.20" max="1.00" step="0.05" value="0.50">
+        </div>
+        <div class="toggle-row">
+          <span>Allow ±10% size variation</span>
+          <div class="switch" id="ocAllowSizeVariationToggle"></div>
+        </div>
+        <div class="field" style="margin-top:8px;">
+          <div class="field-label"><span>Max objects</span></div>
+          <input type="number" id="ocMaxObjectsInput" class="toolbar-number" style="width:80px;" min="1" max="1000" value="200">
+        </div>
+        <div class="toggle-row">
+          <span>Show boxes</span>
+          <div class="switch on" id="ocShowBoxesToggle"></div>
+        </div>
+        <div class="toggle-row">
+          <span>Show numbers</span>
+          <div class="switch on" id="ocShowNumbersToggle"></div>
+        </div>
+      </div>
+
+      <div class="inspector-section object-counting-only hidden">
+        <p class="inspector-title">Judging</p>
+        <div class="toggle-row">
+          <span>Judge enabled</span>
+          <div class="switch" id="ocJudgeEnabledToggle"></div>
+        </div>
+        <p class="hint-text">Enable judging to log and count inspections and to acknowledge Modbus triggers.</p>
+        <div class="field" style="margin-top:8px;">
+          <div class="field-label"><span>Count min</span><span style="font-size:11px;color:var(--text-faint);">(0 = none)</span></div>
+          <input type="number" id="ocCountMinInput" class="toolbar-number" style="width:80px;" min="0" value="0">
+        </div>
+        <div class="field">
+          <div class="field-label"><span>Count max</span><span style="font-size:11px;color:var(--text-faint);">(0 = none)</span></div>
+          <input type="number" id="ocCountMaxInput" class="toolbar-number" style="width:80px;" min="0" value="0">
+        </div>
+      </div>
+
+      <div class="inspector-section object-counting-only hidden">
+        <p class="inspector-title">Template</p>
+        <img id="ocTemplateThumbnail" class="hidden" alt="Template preview" style="width:100%;border-radius:4px;border:1px solid var(--cyan);margin-bottom:8px;">
+        <button class="full-btn" id="ocTeachTemplateBtn"><i class="ti ti-camera"></i> Teach template</button>
+        <button class="full-btn neutral" id="ocResetTemplateBtn" style="margin-top:6px;"><i class="ti ti-refresh"></i> Reset template</button>
+        <p class="hint-text" id="ocTeachError" style="color:var(--ng);display:none;"></p>
+        <p class="hint-text">Objects must face the same way as the taught example.</p>
+      </div>
+
+      <!-- ========== Target Extraction ========== -->
+      <div class="inspector-section target-extraction-only hidden">
+        <p class="inspector-title">Extraction readout</p>
+        <div class="stat-row"><span class="label">Engine</span><span class="value" id="teStatEngine">—</span></div>
+        <div class="stat-row"><span class="label">Area px</span><span class="value" id="teStatAreaPx">—</span></div>
+        <div class="stat-row"><span class="label">Area ratio</span><span class="value" id="teStatAreaRatio">—</span></div>
+        <div class="stat-row"><span class="label">Latency</span><span class="value" id="teStatLatency">— ms</span></div>
+        <div class="stat-row"><span class="label">Judgment</span><span class="value" id="teStatJudgment">—</span></div>
+      </div>
+
+      <div class="inspector-section target-extraction-only hidden">
+        <p class="inspector-title">Engine settings</p>
+        <div class="field">
+          <div class="field-label"><span>Engine</span></div>
+          <select class="inline-select" id="teEngineSelect">
+            <option value="auto">auto</option>
+            <option value="sam">sam</option>
+            <option value="grabcut">grabcut</option>
+          </select>
+        </div>
+        <div class="field">
+          <div class="field-label"><span>View mode</span></div>
+          <select class="inline-select" id="teViewModeSelect">
+            <option value="overlay">overlay</option>
+            <option value="cutout">cutout</option>
+          </select>
+        </div>
+        <div class="field">
+          <div class="field-label"><span>GrabCut iterations</span><span class="field-value" id="teGrabcutIterVal">5</span></div>
+          <input type="range" id="teGrabcutIterSlider" min="1" max="10" step="1" value="5">
+        </div>
+      </div>
+
+      <div class="inspector-section target-extraction-only hidden">
+        <p class="inspector-title">Judging</p>
+        <div class="toggle-row">
+          <span>Judge enabled</span>
+          <div class="switch" id="teJudgeEnabledToggle"></div>
+        </div>
+        <p class="hint-text">Enable judging to log and count inspections and to acknowledge Modbus triggers.</p>
+        <div class="field" style="margin-top:8px;">
+          <div class="field-label"><span>Min area ratio</span><span class="field-value" id="teMinAreaRatioVal">0.10</span></div>
+          <input type="range" id="teMinAreaRatioSlider" min="0.00" max="0.99" step="0.01" value="0.10">
+        </div>
+        <div class="field">
+          <div class="field-label"><span>Max area ratio</span><span class="field-value" id="teMaxAreaRatioVal">0.95</span></div>
+          <input type="range" id="teMaxAreaRatioSlider" min="0.01" max="1.00" step="0.01" value="0.95">
+        </div>
+      </div>
+
+      <div class="inspector-section target-extraction-only hidden">
+        <p class="inspector-title">Target box</p>
+        <button class="full-btn" id="teSetRoiBtn"><i class="ti ti-frame"></i> Set target box</button>
+        <button class="full-btn neutral" id="teResetRoiBtn" style="margin-top:6px;"><i class="ti ti-refresh"></i> Reset target box</button>
+        <a id="teDownloadExtractedLink" class="full-btn hidden" href="/api/v1/target-extraction/extracted.png" download="extracted.png" style="margin-top:6px;display:block;text-align:center;text-decoration:none;"><i class="ti ti-download"></i> Download extracted PNG</a>
       </div>
 
       <div class="inspector-section">
@@ -896,6 +1023,8 @@ const API_BASES = {
   'core-ai-identify': '/api/v1/modules/active',
   'core-ocr': '/api/v1/modules/active',
   'core-color-analysis': '/api/v1/modules/active',
+  'core-object-counting': '/api/v1/object-counting',
+  'core-target-extraction': '/api/v1/target-extraction',
 };
 function apiBase() { return API_BASES[activeModuleId]; }
 
@@ -979,6 +1108,8 @@ async function setActiveModule(moduleId, force = false) {
   document.querySelectorAll('.ai-identify-only').forEach(el => el.classList.toggle('hidden', moduleId !== 'core-ai-identify'));
   document.querySelectorAll('.ocr-only').forEach(el => el.classList.toggle('hidden', moduleId !== 'core-ocr'));
   document.querySelectorAll('.color-analysis-only').forEach(el => el.classList.toggle('hidden', moduleId !== 'core-color-analysis'));
+  document.querySelectorAll('.object-counting-only').forEach(el => el.classList.toggle('hidden', moduleId !== 'core-object-counting'));
+  document.querySelectorAll('.target-extraction-only').forEach(el => el.classList.toggle('hidden', moduleId !== 'core-target-extraction'));
   calibrateBtn.classList.toggle('hidden', moduleId !== 'core-measurement');
 
   if (moduleId === 'core-ai-identify') resetTeachUIState();
@@ -987,8 +1118,12 @@ async function setActiveModule(moduleId, force = false) {
     log('OCR is slow per-frame on CPU - switch Trigger Mode (top toolbar) to Single or Interval instead of Continuous.', 'warn');
   }
 
+  if (moduleId === 'core-target-extraction' && triggerModeSelect.value === 'continuous') {
+    log('Target Extraction runs only on triggered frames — Continuous mode shows last result only. Use Single or Interval.', 'warn');
+  }
+
   document.getElementById('statStatus').textContent = 'Idle';
-  const names = { 'core-object-detection': 'Object Detection', 'core-measurement': 'Measurement', 'core-ai-identify': 'AI Identify', 'core-ocr': 'OCR', 'core-color-analysis': 'Color Analysis' };
+  const names = { 'core-object-detection': 'Object Detection', 'core-measurement': 'Measurement', 'core-ai-identify': 'AI Identify', 'core-ocr': 'OCR', 'core-color-analysis': 'Color Analysis', 'core-object-counting': 'Object Counting', 'core-target-extraction': 'Target Extraction' };
   log('Switched to ' + (names[moduleId] || moduleId));
 
   // Initialize controls and gallery from server state
@@ -1074,6 +1209,46 @@ async function updateModuleUIFromServer(moduleId) {
     for (let i = 0; i < bc; i++) badThumbnails.push('/api/v1/modules/active/gallery/bad/' + i + '?t=' + stamp);
     renderGallery(document.getElementById('goodGallery'), goodThumbnails, 'good');
     renderGallery(document.getElementById('badGallery'), badThumbnails, 'bad');
+
+  } else if (moduleId === 'core-object-counting') {
+    restoreSlider('ocMatchThresholdSlider', 'ocMatchThresholdVal', s.match_threshold, 2);
+    restoreSlider('ocSuppressFracSlider', 'ocSuppressFracVal', s.suppress_frac, 2);
+    restoreToggle('ocAllowSizeVariationToggle', s.allow_size_variation);
+    setIfPresent('ocMaxObjectsInput', el => { if (s.max_objects != null) el.value = s.max_objects; });
+    restoreToggle('ocShowBoxesToggle', s.show_boxes);
+    restoreToggle('ocShowNumbersToggle', s.show_numbers);
+    restoreToggle('ocJudgeEnabledToggle', s.judge_enabled);
+    setIfPresent('ocCountMinInput', el => { if (s.count_min != null) el.value = s.count_min; });
+    setIfPresent('ocCountMaxInput', el => { if (s.count_max != null) el.value = s.count_max; });
+    // Reload template thumbnail from server (never from browser memory)
+    const tmplImg = document.getElementById('ocTemplateThumbnail');
+    if (tmplImg) {
+      const tmplStatus = t.template_status || 'Untaught';
+      if (tmplStatus === 'Taught') {
+        const tImg = new Image();
+        tImg.onload = () => { tmplImg.src = tImg.src; tmplImg.classList.remove('hidden'); };
+        tImg.onerror = () => {};
+        tImg.src = '/api/v1/object-counting/template.png?t=' + Date.now();
+      } else {
+        tmplImg.src = '';
+        tmplImg.classList.add('hidden');
+      }
+    }
+
+  } else if (moduleId === 'core-target-extraction') {
+    setIfPresent('teEngineSelect', el => { if (s.engine) el.value = s.engine; });
+    setIfPresent('teViewModeSelect', el => { if (s.view_mode) el.value = s.view_mode; });
+    restoreSlider('teGrabcutIterSlider', 'teGrabcutIterVal', s.grabcut_iterations);
+    restoreToggle('teJudgeEnabledToggle', s.judge_enabled);
+    restoreSlider('teMinAreaRatioSlider', 'teMinAreaRatioVal', s.min_area_ratio, 2);
+    restoreSlider('teMaxAreaRatioSlider', 'teMaxAreaRatioVal', s.max_area_ratio, 2);
+    // Update extracted.png download link availability
+    const dlLink = document.getElementById('teDownloadExtractedLink');
+    if (dlLink) {
+      fetch('/api/v1/target-extraction/extracted.png', { method: 'HEAD' })
+        .then(r => { dlLink.classList.toggle('hidden', !r.ok); })
+        .catch(() => { dlLink.classList.add('hidden'); });
+    }
   }
 }
 
@@ -1278,6 +1453,58 @@ function beginPolling() {
         if (telemetry.match === true) { matchEl.textContent = 'MATCH'; matchEl.className = 'value ok'; }
         else if (telemetry.match === false) { matchEl.textContent = 'NO MATCH'; matchEl.className = 'value warn'; }
         else { matchEl.textContent = '—'; matchEl.className = 'value'; }
+
+      } else if (activeModuleId === 'core-object-counting') {
+        const tmplStatusEl = document.getElementById('ocStatTemplateStatus');
+        if (tmplStatusEl) {
+          tmplStatusEl.textContent = telemetry.template_status || 'Untaught';
+          tmplStatusEl.className = 'value ' + (telemetry.template_status === 'Taught' ? 'ok' : 'warn');
+        }
+        const countEl = document.getElementById('ocStatCount');
+        if (countEl) {
+          countEl.textContent = telemetry.count != null ? String(telemetry.count) : '—';
+        }
+        const ocLatEl = document.getElementById('ocStatLatency');
+        if (ocLatEl) ocLatEl.textContent = telemetry.latency_ms != null ? telemetry.latency_ms.toFixed(0) + ' ms' : '— ms';
+        const ocOkEl = document.getElementById('ocStatJudgment');
+        if (ocOkEl) {
+          if (telemetry.is_ok === true) { ocOkEl.textContent = 'OK'; ocOkEl.className = 'value ok'; }
+          else if (telemetry.is_ok === false) { ocOkEl.textContent = 'NG'; ocOkEl.className = 'value warn'; }
+          else { ocOkEl.textContent = '—'; ocOkEl.className = 'value'; }
+        }
+        // Mean match score from matches array
+        const matches = telemetry.matches || [];
+        const ocMeanEl = document.getElementById('ocStatMeanScore');
+        if (ocMeanEl) {
+          if (matches.length > 0) {
+            const mean = matches.reduce((s, m) => s + m.score, 0) / matches.length;
+            ocMeanEl.textContent = mean.toFixed(3);
+          } else {
+            ocMeanEl.textContent = '—';
+          }
+        }
+
+      } else if (activeModuleId === 'core-target-extraction') {
+        const teEngineEl = document.getElementById('teStatEngine');
+        if (teEngineEl) {
+          const eng = telemetry.engine || '—';
+          const fbReason = telemetry.fallback_reason;
+          teEngineEl.textContent = eng + (fbReason ? ' ⚠' : '');
+          teEngineEl.title = fbReason || '';
+          teEngineEl.className = 'value' + (fbReason ? ' amber' : '');
+        }
+        const teAreaPxEl = document.getElementById('teStatAreaPx');
+        if (teAreaPxEl) teAreaPxEl.textContent = telemetry.area_px != null ? String(telemetry.area_px) : '—';
+        const teAreaRatEl = document.getElementById('teStatAreaRatio');
+        if (teAreaRatEl) teAreaRatEl.textContent = telemetry.area_ratio != null ? telemetry.area_ratio.toFixed(3) : '—';
+        const teLatEl = document.getElementById('teStatLatency');
+        if (teLatEl) teLatEl.textContent = telemetry.latency_ms != null ? telemetry.latency_ms.toFixed(0) + ' ms' : '— ms';
+        const teOkEl = document.getElementById('teStatJudgment');
+        if (teOkEl) {
+          if (telemetry.is_ok === true) { teOkEl.textContent = 'OK'; teOkEl.className = 'value ok'; }
+          else if (telemetry.is_ok === false) { teOkEl.textContent = 'NG'; teOkEl.className = 'value warn'; }
+          else { teOkEl.textContent = '—'; teOkEl.className = 'value'; }
+        }
       }
     } catch (e) { /* status endpoint not ready yet */ }
   }, 1500);
@@ -1393,6 +1620,203 @@ wireToggle('showDimsToggle', 'show_dimensions');
         log('Reset failed: ' + (result.error || 'unknown error'), 'warn');
       }
     });
+
+// ---------- Object Counting settings wiring ----------
+(function() {
+  function ocApiPost(path, body) {
+    return fetch('/api/v1/object-counting' + path, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body || {})
+    }).then(r => r.json());
+  }
+
+  const ocMatchThresholdSlider = document.getElementById('ocMatchThresholdSlider');
+  const ocMatchThresholdVal = document.getElementById('ocMatchThresholdVal');
+  if (ocMatchThresholdSlider) {
+    ocMatchThresholdSlider.addEventListener('input', () => { ocMatchThresholdVal.textContent = parseFloat(ocMatchThresholdSlider.value).toFixed(2); });
+    ocMatchThresholdSlider.addEventListener('change', async () => {
+      await ocApiPost('/settings', { match_threshold: parseFloat(ocMatchThresholdSlider.value) });
+      log('OC match threshold → ' + ocMatchThresholdSlider.value);
+    });
+  }
+
+  const ocSuppressFracSlider = document.getElementById('ocSuppressFracSlider');
+  const ocSuppressFracVal = document.getElementById('ocSuppressFracVal');
+  if (ocSuppressFracSlider) {
+    ocSuppressFracSlider.addEventListener('input', () => { ocSuppressFracVal.textContent = parseFloat(ocSuppressFracSlider.value).toFixed(2); });
+    ocSuppressFracSlider.addEventListener('change', async () => {
+      await ocApiPost('/settings', { suppress_frac: parseFloat(ocSuppressFracSlider.value) });
+      log('OC duplicate suppression → ' + ocSuppressFracSlider.value);
+    });
+  }
+
+  const ocAllowSizeVariationToggle = document.getElementById('ocAllowSizeVariationToggle');
+  if (ocAllowSizeVariationToggle) {
+    ocAllowSizeVariationToggle.addEventListener('click', async () => {
+      ocAllowSizeVariationToggle.classList.toggle('on');
+      await ocApiPost('/settings', { allow_size_variation: ocAllowSizeVariationToggle.classList.contains('on') });
+      log('OC allow size variation → ' + ocAllowSizeVariationToggle.classList.contains('on'));
+    });
+  }
+
+  const ocMaxObjectsInput = document.getElementById('ocMaxObjectsInput');
+  if (ocMaxObjectsInput) {
+    ocMaxObjectsInput.addEventListener('change', async () => {
+      await ocApiPost('/settings', { max_objects: parseInt(ocMaxObjectsInput.value) });
+      log('OC max objects → ' + ocMaxObjectsInput.value);
+    });
+  }
+
+  const ocShowBoxesToggle = document.getElementById('ocShowBoxesToggle');
+  if (ocShowBoxesToggle) {
+    ocShowBoxesToggle.addEventListener('click', async () => {
+      ocShowBoxesToggle.classList.toggle('on');
+      await ocApiPost('/settings', { show_boxes: ocShowBoxesToggle.classList.contains('on') });
+    });
+  }
+
+  const ocShowNumbersToggle = document.getElementById('ocShowNumbersToggle');
+  if (ocShowNumbersToggle) {
+    ocShowNumbersToggle.addEventListener('click', async () => {
+      ocShowNumbersToggle.classList.toggle('on');
+      await ocApiPost('/settings', { show_numbers: ocShowNumbersToggle.classList.contains('on') });
+    });
+  }
+
+  const ocJudgeEnabledToggle = document.getElementById('ocJudgeEnabledToggle');
+  if (ocJudgeEnabledToggle) {
+    ocJudgeEnabledToggle.addEventListener('click', async () => {
+      ocJudgeEnabledToggle.classList.toggle('on');
+      await ocApiPost('/settings', { judge_enabled: ocJudgeEnabledToggle.classList.contains('on') });
+      log('OC judge enabled → ' + ocJudgeEnabledToggle.classList.contains('on'));
+    });
+  }
+
+  const ocCountMinInput = document.getElementById('ocCountMinInput');
+  if (ocCountMinInput) {
+    ocCountMinInput.addEventListener('change', async () => {
+      await ocApiPost('/settings', { count_min: parseInt(ocCountMinInput.value) });
+      log('OC count min → ' + ocCountMinInput.value);
+    });
+  }
+
+  const ocCountMaxInput = document.getElementById('ocCountMaxInput');
+  if (ocCountMaxInput) {
+    ocCountMaxInput.addEventListener('change', async () => {
+      await ocApiPost('/settings', { count_max: parseInt(ocCountMaxInput.value) });
+      log('OC count max → ' + ocCountMaxInput.value);
+    });
+  }
+
+  // Teach template
+  const ocTeachTemplateBtn = document.getElementById('ocTeachTemplateBtn');
+  if (ocTeachTemplateBtn) {
+    ocTeachTemplateBtn.addEventListener('click', () => {
+      if (activeModuleId !== 'core-object-counting') return;
+      startTeach('oc-template');
+    });
+  }
+
+  // Reset template
+  const ocResetTemplateBtn = document.getElementById('ocResetTemplateBtn');
+  if (ocResetTemplateBtn) {
+    ocResetTemplateBtn.addEventListener('click', async () => {
+      const result = await ocApiPost('/reset-template');
+      if (result.success) {
+        const tmplImg = document.getElementById('ocTemplateThumbnail');
+        if (tmplImg) { tmplImg.src = ''; tmplImg.classList.add('hidden'); }
+        log('OC template reset', 'ok');
+      } else {
+        log('OC reset template failed: ' + (result.error || 'unknown error'), 'warn');
+      }
+    });
+  }
+})();
+
+// ---------- Target Extraction settings wiring ----------
+(function() {
+  function teApiPost(path, body) {
+    return fetch('/api/v1/target-extraction' + path, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body || {})
+    }).then(r => r.json());
+  }
+
+  const teEngineSelect = document.getElementById('teEngineSelect');
+  if (teEngineSelect) {
+    teEngineSelect.addEventListener('change', async () => {
+      await teApiPost('/settings', { engine: teEngineSelect.value });
+      log('TE engine → ' + teEngineSelect.value);
+    });
+  }
+
+  const teViewModeSelect = document.getElementById('teViewModeSelect');
+  if (teViewModeSelect) {
+    teViewModeSelect.addEventListener('change', async () => {
+      await teApiPost('/settings', { view_mode: teViewModeSelect.value });
+      log('TE view mode → ' + teViewModeSelect.value);
+    });
+  }
+
+  const teGrabcutIterSlider = document.getElementById('teGrabcutIterSlider');
+  const teGrabcutIterVal = document.getElementById('teGrabcutIterVal');
+  if (teGrabcutIterSlider) {
+    teGrabcutIterSlider.addEventListener('input', () => { teGrabcutIterVal.textContent = teGrabcutIterSlider.value; });
+    teGrabcutIterSlider.addEventListener('change', async () => {
+      await teApiPost('/settings', { grabcut_iterations: parseInt(teGrabcutIterSlider.value) });
+      log('TE GrabCut iterations → ' + teGrabcutIterSlider.value);
+    });
+  }
+
+  const teJudgeEnabledToggle = document.getElementById('teJudgeEnabledToggle');
+  if (teJudgeEnabledToggle) {
+    teJudgeEnabledToggle.addEventListener('click', async () => {
+      teJudgeEnabledToggle.classList.toggle('on');
+      await teApiPost('/settings', { judge_enabled: teJudgeEnabledToggle.classList.contains('on') });
+      log('TE judge enabled → ' + teJudgeEnabledToggle.classList.contains('on'));
+    });
+  }
+
+  const teMinAreaRatioSlider = document.getElementById('teMinAreaRatioSlider');
+  const teMinAreaRatioVal = document.getElementById('teMinAreaRatioVal');
+  if (teMinAreaRatioSlider) {
+    teMinAreaRatioSlider.addEventListener('input', () => { teMinAreaRatioVal.textContent = parseFloat(teMinAreaRatioSlider.value).toFixed(2); });
+    teMinAreaRatioSlider.addEventListener('change', async () => {
+      await teApiPost('/settings', { min_area_ratio: parseFloat(teMinAreaRatioSlider.value) });
+      log('TE min area ratio → ' + teMinAreaRatioSlider.value);
+    });
+  }
+
+  const teMaxAreaRatioSlider = document.getElementById('teMaxAreaRatioSlider');
+  const teMaxAreaRatioVal = document.getElementById('teMaxAreaRatioVal');
+  if (teMaxAreaRatioSlider) {
+    teMaxAreaRatioSlider.addEventListener('input', () => { teMaxAreaRatioVal.textContent = parseFloat(teMaxAreaRatioSlider.value).toFixed(2); });
+    teMaxAreaRatioSlider.addEventListener('change', async () => {
+      await teApiPost('/settings', { max_area_ratio: parseFloat(teMaxAreaRatioSlider.value) });
+      log('TE max area ratio → ' + teMaxAreaRatioSlider.value);
+    });
+  }
+
+  const teSetRoiBtn = document.getElementById('teSetRoiBtn');
+  if (teSetRoiBtn) {
+    teSetRoiBtn.addEventListener('click', () => {
+      if (activeModuleId !== 'core-target-extraction') return;
+      startTeach('te-roi');
+    });
+  }
+
+  const teResetRoiBtn = document.getElementById('teResetRoiBtn');
+  if (teResetRoiBtn) {
+    teResetRoiBtn.addEventListener('click', async () => {
+      const result = await teApiPost('/reset-roi');
+      if (result.success) {
+        log('TE ROI reset', 'ok');
+      } else {
+        log('TE reset ROI failed: ' + (result.error || 'unknown error'), 'warn');
+      }
+    });
+  }
+})();
 
 // ---------- Measurement calibration workflow ----------
 const calibrationCanvas = document.getElementById('calibrationCanvas');
@@ -1604,7 +2028,8 @@ async function removeReference(cls, index) {
 }
 
 function startTeach(target) {
-  if (activeModuleId !== 'core-ai-identify' && activeModuleId !== 'core-color-analysis') return;
+  const allowedModules = ['core-ai-identify', 'core-color-analysis', 'core-object-counting', 'core-target-extraction'];
+  if (!allowedModules.includes(activeModuleId)) return;
   if (!isStreamRunning) {
     log('Start the stream before teaching', 'warn');
     return;
@@ -1630,10 +2055,19 @@ function startTeach(target) {
   streamImg.style.display = 'none';
   teachCanvas.classList.remove('hidden');
   teachPanel.classList.remove('hidden');
-  teachPanel.className = 'overlay-panel teach-' + (target === 'reference' ? 'good' : target);
-  teachHint.textContent = target === 'reference'
-    ? 'Drag a tight box around the reference color swatch'
-    : 'Drag a tight box around the ' + target.toUpperCase() + ' feature';
+  // Panel border colour by target type
+  const borderClass = (target === 'bad') ? 'teach-bad' : 'teach-good';
+  teachPanel.className = 'overlay-panel ' + borderClass;
+
+  if (target === 'reference') {
+    teachHint.textContent = 'Drag a tight box around the reference color swatch';
+  } else if (target === 'oc-template') {
+    teachHint.textContent = 'Drag a loose box around ONE example object (include some background)';
+  } else if (target === 'te-roi') {
+    teachHint.textContent = 'Drag a box around the target region (include some surrounding background)';
+  } else {
+    teachHint.textContent = 'Drag a tight box around the ' + target.toUpperCase() + ' feature';
+  }
   teachRetryBtn.classList.add('hidden');
   teachConfirmBtn.classList.add('hidden');
   scanline.classList.add('paused');
@@ -1722,6 +2156,46 @@ teachConfirmBtn.addEventListener('click', async () => {
       endTeach();
     } else {
       log('Teach reference failed: ' + (result.error || 'unknown error'), 'warn');
+    }
+    return;
+  }
+
+  if (teachTarget === 'oc-template') {
+    const result = await fetch('/api/v1/object-counting/teach-template', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ x: teachRect.x, y: teachRect.y, w: teachRect.w, h: teachRect.h }),
+    }).then(r => r.json());
+    const errEl = document.getElementById('ocTeachError');
+    if (result.success) {
+      // Always load thumbnail from server so it matches what the backend stores
+      const tmplImg = document.getElementById('ocTemplateThumbnail');
+      if (tmplImg) {
+        const tImg = new Image();
+        tImg.onload = () => { tmplImg.src = tImg.src; tmplImg.classList.remove('hidden'); };
+        tImg.onerror = () => {};
+        tImg.src = '/api/v1/object-counting/template.png?t=' + Date.now();
+      }
+      if (errEl) errEl.style.display = 'none';
+      log('OC template taught', 'ok');
+      endTeach();
+    } else {
+      const msg = result.error || 'unknown error';
+      if (errEl) { errEl.textContent = msg; errEl.style.display = ''; }
+      log('OC teach template failed: ' + msg, 'warn');
+    }
+    return;
+  }
+
+  if (teachTarget === 'te-roi') {
+    const result = await fetch('/api/v1/target-extraction/set-roi', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ x: teachRect.x, y: teachRect.y, w: teachRect.w, h: teachRect.h }),
+    }).then(r => r.json());
+    if (result.success) {
+      log('TE ROI set', 'ok');
+      endTeach();
+    } else {
+      log('TE set ROI failed: ' + (result.error || 'unknown error'), 'warn');
     }
     return;
   }
