@@ -5,6 +5,7 @@ import socket
 from app.core.hardware import HardwareManager, MODULE_CODE_MAP
 from app.core.state import StateStore
 from app.core.config_service import ConfigService
+from app.core.models.results import ObjectCountingResult, TargetExtractionResult
 
 
 def _find_free_port():
@@ -134,3 +135,63 @@ def test_hardware_frame_processed_event_handling():
     })
     assert hw._module_last_status.get("core-target-extraction") == 2
     assert hw._last_trigger_id == 104
+
+
+def test_hardware_real_result_classes_codes_6_and_7():
+    """Verify that REAL result models (ObjectCountingResult, TargetExtractionResult)
+    derive status 1 (OK) or 2 (NG) through _on_frame_processed via hasattr('is_ok').
+    Neither class defines 'match' or 'classification', so they fall through to 'is_ok'."""
+    config = MagicMock(spec=ConfigService)
+    settings_mock = MagicMock()
+    settings_mock.modbus_enabled = False
+    config.get_settings.return_value = settings_mock
+
+    hw = HardwareManager(config, MagicMock(), StateStore())
+
+    # 1. ObjectCountingResult with is_ok=True -> status 1
+    res_count_ok = ObjectCountingResult(template_status="Taught", count=5, is_ok=True)
+    assert not hasattr(res_count_ok, "match")
+    assert not hasattr(res_count_ok, "classification")
+    hw._on_frame_processed({
+        "module_id": "core-object-counting",
+        "triggered": True,
+        "trigger_id": 301,
+        "result": res_count_ok,
+    })
+    assert hw._module_last_status.get("core-object-counting") == 1
+    assert hw._last_trigger_id == 301
+
+    # 2. ObjectCountingResult with is_ok=False -> status 2
+    res_count_ng = ObjectCountingResult(template_status="Taught", count=2, is_ok=False, reason="count 2 outside [5, 5]")
+    hw._on_frame_processed({
+        "module_id": "core-object-counting",
+        "triggered": True,
+        "trigger_id": 302,
+        "result": res_count_ng,
+    })
+    assert hw._module_last_status.get("core-object-counting") == 2
+    assert hw._last_trigger_id == 302
+
+    # 3. TargetExtractionResult with is_ok=True -> status 1
+    res_te_ok = TargetExtractionResult(roi_status="Taught", engine="grabcut", area_ratio=0.5, is_ok=True)
+    assert not hasattr(res_te_ok, "match")
+    assert not hasattr(res_te_ok, "classification")
+    hw._on_frame_processed({
+        "module_id": "core-target-extraction",
+        "triggered": True,
+        "trigger_id": 303,
+        "result": res_te_ok,
+    })
+    assert hw._module_last_status.get("core-target-extraction") == 1
+    assert hw._last_trigger_id == 303
+
+    # 4. TargetExtractionResult with is_ok=False -> status 2
+    res_te_ng = TargetExtractionResult(roi_status="Taught", engine="grabcut", area_ratio=0.02, is_ok=False, reason="area ratio below 0.10")
+    hw._on_frame_processed({
+        "module_id": "core-target-extraction",
+        "triggered": True,
+        "trigger_id": 304,
+        "result": res_te_ng,
+    })
+    assert hw._module_last_status.get("core-target-extraction") == 2
+    assert hw._last_trigger_id == 304

@@ -24,6 +24,7 @@ from app.core.hardware import HardwareManager, MODULE_CODE_MAP
 from app.core.state import StateStore
 from app.core.event_bus import EventBus
 from app.core.config_service import ConfigService
+from app.core.models.results import ObjectCountingResult, TargetExtractionResult
 
 
 def _find_free_port():
@@ -406,17 +407,16 @@ class TestPerModuleStatus:
         assert not rr.isError()
         assert rr.registers[0] == 0, f"Expected Idle (0), got {rr.registers[0]}"
 
-        # Simulate triggered inspection with OK
-        result_mock = MagicMock()
-        result_mock.is_ok = True
-        del result_mock.match
-        del result_mock.classification
+        # Simulate triggered inspection with real ObjectCountingResult (is_ok=True)
+        real_result = ObjectCountingResult(template_status="Taught", count=8, is_ok=True)
+        assert not hasattr(real_result, "match")
+        assert not hasattr(real_result, "classification")
         hw.state_store.increment_ok("core-object-counting")
         hw._on_frame_processed({
             "module_id": "core-object-counting",
             "triggered": True,
             "trigger_id": 201,
-            "result": result_mock,
+            "result": real_result,
         })
 
         time.sleep(0.3)
@@ -453,17 +453,16 @@ class TestPerModuleStatus:
         assert not rr.isError()
         assert rr.registers[0] == 0, f"Expected Idle (0), got {rr.registers[0]}"
 
-        # Simulate triggered inspection with NG
-        result_mock = MagicMock()
-        result_mock.is_ok = False
-        del result_mock.match
-        del result_mock.classification
+        # Simulate triggered inspection with real TargetExtractionResult (is_ok=False)
+        real_result = TargetExtractionResult(roi_status="Taught", engine="grabcut", area_ratio=0.01, is_ok=False, reason="area ratio 0.01 below 0.10")
+        assert not hasattr(real_result, "match")
+        assert not hasattr(real_result, "classification")
         hw.state_store.increment_ng(module_id="core-target-extraction")
         hw._on_frame_processed({
             "module_id": "core-target-extraction",
             "triggered": True,
             "trigger_id": 202,
-            "result": result_mock,
+            "result": real_result,
         })
 
         time.sleep(0.3)
