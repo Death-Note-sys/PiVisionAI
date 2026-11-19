@@ -147,3 +147,28 @@ def test_composite_paints_background_and_keeps_target():
     out = composite_on_color(scene, truth, color=(10, 10, 10))
     assert tuple(out[0, 0]) == (10, 10, 10)
     assert np.array_equal(out[120, 160], scene[120, 160])
+
+
+def test_grabcut_on_crop_matches_full_frame_result():
+    scene, truth, box = make_scene()
+    cropped = grabcut_mask(scene, box)                 # default: padded crop
+    full = grabcut_mask(scene, box, margin=None)       # whole frame
+    assert iou(cropped, full) > 0.95
+    assert iou(cropped, truth) > 0.85
+
+
+def test_grabcut_mask_is_empty_outside_the_padded_crop():
+    scene, _, box = make_scene()
+    x, y, w, h = box
+    px, py = int(w * 0.25), int(h * 0.25)
+    mask = grabcut_mask(scene, box, margin=0.25)
+    assert mask.shape == scene.shape[:2]
+    outside = mask.copy()
+    outside[max(0, y - py):y + h + py, max(0, x - px):x + w + px] = 0
+    assert outside.sum() == 0
+
+
+def test_grabcut_box_touching_the_frame_edge_still_works():
+    scene, truth, _ = make_scene(center=(60, 60), radius=40)
+    mask = grabcut_mask(scene, (0, 0, 130, 130))
+    assert iou(mask, truth) > 0.8
