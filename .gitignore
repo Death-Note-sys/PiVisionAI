@@ -33,4 +33,4 @@ data/
 
 Ultralytics/
 *.pt
-models/
+/models/
