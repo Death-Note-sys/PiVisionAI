@@ -101,8 +101,8 @@ class HardwareManager:
                 self._module_last_status[module_id] = status
                 self._last_status_ts = time.time()
 
-            with self._trigger_id_lock:
-                self._last_trigger_id = trigger_id & 0xFFFF
+                with self._trigger_id_lock:
+                    self._last_trigger_id = trigger_id & 0xFFFF
 
     def initialize(self) -> bool:
         if not self.enabled:
