@@ -10,6 +10,7 @@ from app.core.renderer_manager import RendererManager
 from app.core.output_manager import OutputManager
 from app.core.coordinator import InspectionCoordinator
 from app.core.state import StateStore
+from app.core.hardware import HardwareManager
 from app.modules.object_counting.controller import ObjectCountingController
 from app.modules.object_counting.settings import ObjectCountingSettings
 
@@ -160,3 +161,69 @@ def test_object_counting_pipeline_single_vs_continuous_trigger():
     per_module = state_store.get_counters("core-object-counting")
     assert per_module["ng_count"] == 1
     assert per_module["total_count"] == 2
+
+
+def test_object_counting_pipeline_judge_disabled_no_row_no_counter_hr11_unchanged(tmp_path, monkeypatch):
+    monkeypatch.setenv("PI_VISION_DATA_DIR", str(tmp_path))
+    event_bus = EventBus()
+    state_store = StateStore(persist=False)
+    output_manager = MagicMock(spec=OutputManager)
+    output_manager.broadcast = MagicMock()
+    output_manager.save_ng = MagicMock()
+
+    coordinator = InspectionCoordinator(event_bus, state_store, output_manager)
+    renderer_manager = RendererManager()
+
+    pipeline = Pipeline(event_bus, renderer_manager, output_manager, coordinator=coordinator)
+
+    # Initialize HardwareManager to monitor HR11 and HR1
+    config = MagicMock()
+    config.get_settings.return_value = MagicMock(modbus_enabled=False, modbus_port=5020, modbus_host="127.0.0.1")
+    hw = HardwareManager(config, event_bus, state_store)
+
+    settings = ObjectCountingSettings()
+    controller = ObjectCountingController(event_bus, settings)
+
+    template = make_template(size=32, seed=7)
+    scene = make_scene(template, POSITIONS)
+
+    controller.on_raw_frame(scene)
+    assert controller.teach_template(10, 10, 32, 32) is True
+
+    # Explicitly ensure judging is disabled
+    controller.configure({"judge_enabled": False})
+
+    pipeline.set_module(controller)
+    pipeline.set_trigger_mode("single")
+
+    initial_hr11 = hw._last_trigger_id
+    assert initial_hr11 == 0
+
+    db_path = coordinator._get_db_path()
+
+    # Fire trigger
+    pipeline.fire_trigger()
+    pipeline.process_frame(scene)
+
+    # 1. 0 rows written to database
+    with sqlite3.connect(db_path) as conn:
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS inspections(
+                id INTEGER PRIMARY KEY, ts REAL, trigger_id INTEGER,
+                module_id TEXT, judgment TEXT, code INTEGER, reason TEXT,
+                values_json TEXT, raw_path TEXT, overlay_path TEXT
+            )
+        ''')
+        cur = conn.cursor()
+        cur.execute("SELECT COUNT(*) FROM inspections WHERE module_id = 'core-object-counting'")
+        assert cur.fetchone()[0] == 0
+
+    # 2. 0 counter change
+    assert state_store.total_count == 0
+    assert state_store.ok_count == 0
+    assert state_store.ng_count == 0
+
+    # 3. HR11 unchanged
+    assert hw._last_trigger_id == initial_hr11
+    assert hw._module_last_status.get("core-object-counting", 0) == 0
+

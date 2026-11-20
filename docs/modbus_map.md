@@ -93,6 +93,8 @@ A PLC should:
 
 > Two consecutive identical judgments are distinguishable because Last Trigger ID is monotonic (wraps at 65535).
 
+A trigger on a module whose judging is disabled (judge_enabled = false) produces no judgment: HR11 and Total Count do not change and HR1 stays 0. Enable judging on the module before driving it from a PLC.
+
 ---
 
 ## Counter Reset
