@@ -52,15 +52,33 @@ class TargetExtractionService(IService):
         return None
 
     def get_status(self) -> Dict[str, Any]:
+        roi_status = "Untaught"
+        if self.module_ref and hasattr(self.module_ref, "roi_status"):
+            roi_status = self.module_ref.roi_status
+        elif self.module_ref and hasattr(self.module_ref, "last_result"):
+            roi_status = getattr(self.module_ref.last_result, "roi_status", "Untaught")
+
         status = {
             "active": self.is_active,
             "paused": self.is_paused,
             "settings": self.settings.get_settings(),
+            "telemetry": {
+                "roi_status": roi_status,
+                "engine": None,
+                "fallback_reason": None,
+                "area_px": 0,
+                "area_ratio": 0.0,
+                "bbox": None,
+                "centroid": None,
+                "is_ok": None,
+                "reason": None,
+                "latency_ms": 0.0,
+            },
         }
         if self.module_ref and hasattr(self.module_ref, "last_result"):
             r = self.module_ref.last_result
-            status["telemetry"] = {
-                "roi_status": r.roi_status,
+            status["telemetry"].update({
+                "roi_status": roi_status,
                 "engine": r.engine,
                 "fallback_reason": r.fallback_reason,
                 "area_px": r.area_px,
@@ -70,5 +88,5 @@ class TargetExtractionService(IService):
                 "is_ok": r.is_ok,
                 "reason": r.reason,
                 "latency_ms": r.latency_ms,
-            }
+            })
         return status

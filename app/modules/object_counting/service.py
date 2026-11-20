@@ -54,18 +54,31 @@ class ObjectCountingService(IService):
         return None
 
     def get_status(self) -> Dict[str, Any]:
+        tpl_status = "Untaught"
+        if self.module_ref and hasattr(self.module_ref, "template_status"):
+            tpl_status = self.module_ref.template_status
+        elif self.module_ref and hasattr(self.module_ref, "last_result"):
+            tpl_status = getattr(self.module_ref.last_result, "template_status", "Untaught")
+
         status = {
             "active": self.is_active,
             "paused": self.is_paused,
             "settings": self.settings.get_settings(),
+            "telemetry": {
+                "template_status": tpl_status,
+                "count": 0,
+                "matches": [],
+                "is_ok": None,
+                "latency_ms": 0.0,
+            },
         }
         if self.module_ref and hasattr(self.module_ref, "last_result"):
             r = self.module_ref.last_result
-            status["telemetry"] = {
-                "template_status": r.template_status,
+            status["telemetry"].update({
+                "template_status": tpl_status,
                 "count": r.count,
                 "matches": r.matches,
                 "is_ok": r.is_ok,
                 "latency_ms": r.latency_ms,
-            }
+            })
         return status

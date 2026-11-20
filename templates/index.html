@@ -924,6 +924,8 @@
       <div class="inspector-section target-extraction-only hidden">
         <p class="inspector-title">Extraction readout</p>
         <div class="stat-row"><span class="label">Engine</span><span class="value" id="teStatEngine">—</span></div>
+        <div class="stat-row hidden" id="teFallbackRow"><span class="label">Fallback</span><span class="value warn" id="teStatFallbackReason">—</span></div>
+        <div class="stat-row"><span class="label">Target</span><span class="value warn" id="teStatRoiStatus">Untaught</span></div>
         <div class="stat-row"><span class="label">Area px</span><span class="value" id="teStatAreaPx">—</span></div>
         <div class="stat-row"><span class="label">Area ratio</span><span class="value" id="teStatAreaRatio">—</span></div>
         <div class="stat-row"><span class="label">Latency</span><span class="value" id="teStatLatency">— ms</span></div>
@@ -1036,11 +1038,18 @@ const consoleBody = document.getElementById('consoleBody');
 let statusPoll = null;
 let isStreamRunning = false;
 
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  const div = document.createElement('div');
+  div.textContent = String(str);
+  return div.innerHTML;
+}
+
 function log(msg, level) {
   const line = document.createElement('div');
   line.className = 'console-line' + (level ? ' ' + level : '');
   const ts = new Date().toLocaleTimeString('en-GB', { hour12: false });
-  line.innerHTML = '<span class="ts">' + ts + '</span><span class="msg">' + msg + '</span>';
+  line.innerHTML = '<span class="ts">' + ts + '</span><span class="msg">' + escapeHtml(msg) + '</span>';
   consoleBody.appendChild(line);
   consoleBody.scrollTop = consoleBody.scrollHeight;
 }
@@ -1242,6 +1251,12 @@ async function updateModuleUIFromServer(moduleId) {
     restoreToggle('teJudgeEnabledToggle', s.judge_enabled);
     restoreSlider('teMinAreaRatioSlider', 'teMinAreaRatioVal', s.min_area_ratio, 2);
     restoreSlider('teMaxAreaRatioSlider', 'teMaxAreaRatioVal', s.max_area_ratio, 2);
+    const teRoiEl = document.getElementById('teStatRoiStatus');
+    if (teRoiEl) {
+      const roiStatus = t.roi_status || 'Untaught';
+      teRoiEl.textContent = roiStatus;
+      teRoiEl.className = 'value ' + (roiStatus === 'Taught' ? 'ok' : 'warn');
+    }
     // Update extracted.png download link availability
     const dlLink = document.getElementById('teDownloadExtractedLink');
     if (dlLink) {
@@ -1486,12 +1501,25 @@ function beginPolling() {
 
       } else if (activeModuleId === 'core-target-extraction') {
         const teEngineEl = document.getElementById('teStatEngine');
+        const teFbRow = document.getElementById('teFallbackRow');
+        const teFbEl = document.getElementById('teStatFallbackReason');
         if (teEngineEl) {
-          const eng = telemetry.engine || '—';
-          const fbReason = telemetry.fallback_reason;
-          teEngineEl.textContent = eng + (fbReason ? ' ⚠' : '');
-          teEngineEl.title = fbReason || '';
-          teEngineEl.className = 'value' + (fbReason ? ' amber' : '');
+          teEngineEl.textContent = telemetry.engine || '—';
+        }
+        if (teFbEl && teFbRow) {
+          if (telemetry.fallback_reason) {
+            teFbEl.textContent = telemetry.fallback_reason;
+            teFbRow.classList.remove('hidden');
+          } else {
+            teFbEl.textContent = '—';
+            teFbRow.classList.add('hidden');
+          }
+        }
+        const teRoiEl = document.getElementById('teStatRoiStatus');
+        if (teRoiEl) {
+          const roiStatus = telemetry.roi_status || 'Untaught';
+          teRoiEl.textContent = roiStatus;
+          teRoiEl.className = 'value ' + (roiStatus === 'Taught' ? 'ok' : 'warn');
         }
         const teAreaPxEl = document.getElementById('teStatAreaPx');
         if (teAreaPxEl) teAreaPxEl.textContent = telemetry.area_px != null ? String(telemetry.area_px) : '—';
