@@ -1533,6 +1533,8 @@ function beginPolling() {
           else if (telemetry.is_ok === false) { teOkEl.textContent = 'NG'; teOkEl.className = 'value warn'; }
           else { teOkEl.textContent = '—'; teOkEl.className = 'value'; }
         }
+        const teDlLink = document.getElementById('teDownloadExtractedLink');
+        if (teDlLink && telemetry.area_px > 0) teDlLink.classList.remove('hidden');
       }
     } catch (e) { /* status endpoint not ready yet */ }
   }, 1500);
