@@ -1534,7 +1534,7 @@ function beginPolling() {
           else { teOkEl.textContent = '—'; teOkEl.className = 'value'; }
         }
         const teDlLink = document.getElementById('teDownloadExtractedLink');
-        if (teDlLink) teDlLink.classList.toggle('hidden', !(telemetry.area_px > 0));
+        if (teDlLink) teDlLink.classList.toggle('hidden', !telemetry.extracted_ready);
       }
     } catch (e) { /* status endpoint not ready yet */ }
   }, 1500);

@@ -283,3 +283,39 @@ def test_default_sam_weights_resolved_against_repo_root_from_other_cwd(clean_te_
     assert Path(weights_path).name == "mobile_sam.pt"
     assert str(REPO_ROOT) in weights_path
 
+
+def test_target_extraction_service_extracted_ready(clean_te_data):
+    """Target extraction telemetry extracted_ready:
+    - no file -> False
+    - after a triggered extraction -> True
+    - new controller instance with the file still on disk -> True
+    """
+    from app.modules.target_extraction.service import TargetExtractionService
+
+    settings = TargetExtractionSettings()
+    seg = _fake_segmenter()
+    ctrl = _controller(settings=settings, segmenter=seg, clean=False)
+    service = TargetExtractionService(settings, module_ref=ctrl)
+
+    # 1. No file -> False
+    status = service.get_status()
+    assert status["telemetry"]["extracted_ready"] is False
+
+    # 2. After a triggered extraction -> True
+    frame = _frame_with_fg()
+    ctrl.on_raw_frame(frame)
+    ctrl.set_roi(20, 20, 60, 50)
+    result = ctrl.process({"frame": frame, "triggered": True})
+    assert result is not None
+
+    status_after = service.get_status()
+    assert status_after["telemetry"]["extracted_ready"] is True
+
+    # 3. New controller instance with the file still on disk -> True
+    new_ctrl = _controller(settings=settings, segmenter=seg, clean=False)
+    assert new_ctrl.last_result.area_px == 0
+    new_service = TargetExtractionService(settings, module_ref=new_ctrl)
+    new_status = new_service.get_status()
+    assert new_status["telemetry"]["extracted_ready"] is True
+
+

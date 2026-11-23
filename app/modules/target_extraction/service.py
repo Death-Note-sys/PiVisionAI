@@ -1,3 +1,4 @@
+import os
 import logging
 from typing import Dict, Any, Optional
 from app.core.contracts import IService
@@ -58,6 +59,9 @@ class TargetExtractionService(IService):
         elif self.module_ref and hasattr(self.module_ref, "last_result"):
             roi_status = getattr(self.module_ref.last_result, "roi_status", "Untaught")
 
+        path = self.get_extraction_path()
+        extracted_ready = bool(path and os.path.exists(path))
+
         status = {
             "active": self.is_active,
             "paused": self.is_paused,
@@ -73,6 +77,7 @@ class TargetExtractionService(IService):
                 "is_ok": None,
                 "reason": None,
                 "latency_ms": 0.0,
+                "extracted_ready": extracted_ready,
             },
         }
         if self.module_ref and hasattr(self.module_ref, "last_result"):
@@ -88,5 +93,6 @@ class TargetExtractionService(IService):
                 "is_ok": r.is_ok,
                 "reason": r.reason,
                 "latency_ms": r.latency_ms,
+                "extracted_ready": extracted_ready,
             })
         return status
