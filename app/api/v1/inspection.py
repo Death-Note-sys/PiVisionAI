@@ -27,14 +27,17 @@ def get_inspection_status():
             active_module_id = container.module_controller.active_metadata.id
 
     counters = container.state_store.get_counters(active_module_id) if container and hasattr(container, "state_store") else {
-        "total_count": 0, "ok_count": 0, "ng_count": 0, "uncertain_count": 0
+        "total_count": 0, "ok_count": 0, "ng_count": 0, "uncertain_count": 0,
+        "last_judgment": None, "last_trigger_id": None,
     }
     return jsonify({
         "module_id": active_module_id,
         "total_count": counters["total_count"],
         "ok_count": counters["ok_count"],
         "ng_count": counters["ng_count"],
-        "uncertain_count": counters.get("uncertain_count", 0)
+        "uncertain_count": counters.get("uncertain_count", 0),
+        "last_judgment": counters.get("last_judgment"),
+        "last_trigger_id": counters.get("last_trigger_id"),
     })
 
 @bp.route('/reset', methods=['POST'])

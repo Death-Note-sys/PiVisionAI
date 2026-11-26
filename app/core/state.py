@@ -27,8 +27,8 @@ class StateStore:
 
         self.counters_file = os.path.join(self.data_dir, "counters.json") if self.persist else None
         
-        # Per-Module Counters: {module_id: {"total_count": 0, "ok_count": 0, "ng_count": 0, "uncertain_count": 0}}
-        self.module_counters: Dict[str, Dict[str, int]] = {}
+        # Per-Module Counters: {module_id: {"total_count": 0, "ok_count": 0, "ng_count": 0, "uncertain_count": 0, "last_judgment": None, "last_trigger_id": None}}
+        self.module_counters: Dict[str, Dict[str, Any]] = {}
         self.active_module_id = "default"
         
         # System State
@@ -77,15 +77,20 @@ class StateStore:
         with self._lock:
             self._ensure_module_counters(self.active_module_id)["ng_count"] = val
 
-    def _ensure_module_counters(self, module_id: str) -> Dict[str, int]:
+    def _ensure_module_counters(self, module_id: str) -> Dict[str, Any]:
         m_id = module_id or "default"
         if m_id not in self.module_counters:
             self.module_counters[m_id] = {
                 "total_count": 0,
                 "ok_count": 0,
                 "ng_count": 0,
-                "uncertain_count": 0
+                "uncertain_count": 0,
+                "last_judgment": None,
+                "last_trigger_id": None,
             }
+        else:
+            self.module_counters[m_id].setdefault("last_judgment", None)
+            self.module_counters[m_id].setdefault("last_trigger_id", None)
         return self.module_counters[m_id]
 
     def _load_counters(self):
@@ -103,7 +108,9 @@ class StateStore:
                             "total_count": data.get("total_count", 0),
                             "ok_count": data.get("ok_count", 0),
                             "ng_count": data.get("ng_count", 0),
-                            "uncertain_count": data.get("uncertain_count", 0)
+                            "uncertain_count": data.get("uncertain_count", 0),
+                            "last_judgment": None,
+                            "last_trigger_id": None,
                         }
                     }
             except Exception as e:
@@ -133,14 +140,23 @@ class StateStore:
             except Exception as e:
                 logger.error(f"Failed to save counters: {e}")
 
-    def increment_ok(self, module_id: Optional[str] = None):
+    def increment_ok(self, module_id: Optional[str] = None, trigger_id: Optional[int] = None):
         with self._lock:
             m = self._ensure_module_counters(module_id or self.active_module_id)
             m["ok_count"] += 1
             m["total_count"] += 1
+            m["last_judgment"] = "OK"
+            if trigger_id is not None:
+                m["last_trigger_id"] = trigger_id
             self._save_counters()
             
-    def increment_ng(self, metadata: Optional[Dict[str, Any]] = None, module_id: Optional[str] = None, is_uncertain: bool = False):
+    def increment_ng(
+        self,
+        metadata: Optional[Dict[str, Any]] = None,
+        module_id: Optional[str] = None,
+        is_uncertain: bool = False,
+        trigger_id: Optional[int] = None,
+    ):
         with self._lock:
             target_mod = module_id or (metadata.get("module_id") if metadata else None) or self.active_module_id
             m = self._ensure_module_counters(target_mod)
@@ -148,6 +164,9 @@ class StateStore:
             m["total_count"] += 1
             if is_uncertain:
                 m["uncertain_count"] = m.get("uncertain_count", 0) + 1
+            m["last_judgment"] = "NG"
+            if trigger_id is not None:
+                m["last_trigger_id"] = trigger_id
             if metadata:
                 self.latest_ng_metadata = metadata
             self._save_counters()
@@ -160,12 +179,14 @@ class StateStore:
                 m["ok_count"] = 0
                 m["ng_count"] = 0
                 m["uncertain_count"] = 0
+                m["last_judgment"] = None
+                m["last_trigger_id"] = None
             else:
                 self.module_counters.clear()
             self.latest_ng_metadata = {}
             self._save_counters()
 
-    def get_counters(self, module_id: Optional[str] = None) -> Dict[str, int]:
+    def get_counters(self, module_id: Optional[str] = None) -> Dict[str, Any]:
         with self._lock:
             m = self._ensure_module_counters(module_id or self.active_module_id)
             return dict(m)

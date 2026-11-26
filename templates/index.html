@@ -648,6 +648,7 @@
       <div>OK: <span id="globalOkCount" style="color: var(--ok)">0</span></div>
       <div>NG: <span id="globalNgCount" style="color: var(--ng)">0</span></div>
       <div>Total: <span id="globalTotalCount">0</span></div>
+      <div>Yield: <span id="globalYield">-</span></div>
     </div>
     <div class="toolbar-spacer"></div>
     <div class="backend-badge"><span class="dot"></span><span id="backendLabel">CPU backend</span></div>
@@ -1142,6 +1143,7 @@ async function setActiveModule(moduleId, force = false) {
   } catch (e) {
     log('Could not load saved state for this module: ' + e.message, 'warn');
   }
+  pollSystemStatus();
 }
 
 function setIfPresent(id, fn) {
@@ -2333,25 +2335,42 @@ log('Object Detection, Measurement, and AI Identify modules registered', 'ok');
 // Global system status polling
 async function pollSystemStatus() {
   try {
-    const res = await fetch('/api/v1/system/status');
-    const status = await res.json();
-    if (!status.error) {
+    const [sysRes, inspRes] = await Promise.all([
+      fetch('/api/v1/system/status'),
+      fetch('/api/v1/inspection/status'),
+    ]);
+    const status = sysRes.ok ? await sysRes.json() : null;
+    const insp = inspRes.ok ? await inspRes.json() : null;
+
+    if (status && !status.error) {
       document.getElementById('globalTotalCount').textContent = status.total_count;
       document.getElementById('globalOkCount').textContent = status.ok_count;
       document.getElementById('globalNgCount').textContent = status.ng_count;
-      
-      const lamp = document.getElementById('globalLamp');
-      if (status.latest_status === 1) {
-        lamp.style.background = 'var(--ok)';
-      } else if (status.latest_status === 2 || status.latest_status === 3) {
-        lamp.style.background = 'var(--ng)';
-      } else {
-        lamp.style.background = 'var(--hairline)';
-      }
-      
+
       // Auto-switch module if changed externally (e.g., Modbus or initialization)
       if (status.active_module_id && status.active_module_id !== activeModuleId) {
         setActiveModule(status.active_module_id);
+      }
+    }
+
+    if (insp && !insp.error) {
+      const lamp = document.getElementById('globalLamp');
+      if (lamp) {
+        if (insp.last_judgment === 'OK') {
+          lamp.style.background = 'var(--ok)';
+        } else if (insp.last_judgment === 'NG') {
+          lamp.style.background = 'var(--ng)';
+        } else {
+          lamp.style.background = 'var(--hairline)';
+        }
+      }
+
+      const yieldEl = document.getElementById('globalYield');
+      if (yieldEl) {
+        const ok = insp.ok_count || 0;
+        const ng = insp.ng_count || 0;
+        const denom = ok + ng;
+        yieldEl.textContent = denom > 0 ? ((ok / denom) * 100).toFixed(1) + '%' : '-';
       }
     }
   } catch(e) {}
@@ -2558,6 +2577,5 @@ setActiveModule(activeModuleId, true);
 
 
 </script>
-<div id="counters">Yield: 100% <button>Reset counters</button></div>
 </body>
 </html>

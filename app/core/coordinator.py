@@ -111,10 +111,10 @@ class InspectionCoordinator:
         judgment_str = "OK" if is_ok else "NG"
 
         if is_ok:
-            self.state_store.increment_ok(module_id=module_id)
+            self.state_store.increment_ok(module_id=module_id, trigger_id=trigger_id)
             logger.info(f"Coordinator: Inspection OK (module={module_id}, trigger={trigger_id})")
         else:
-            self.state_store.increment_ng(metadata=meta, module_id=module_id, is_uncertain=is_uncertain)
+            self.state_store.increment_ng(metadata=meta, module_id=module_id, is_uncertain=is_uncertain, trigger_id=trigger_id)
             # Save frame for NG inspections
             if frame is not None:
                 try:
