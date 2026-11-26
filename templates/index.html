@@ -649,6 +649,7 @@
       <div>NG: <span id="globalNgCount" style="color: var(--ng)">0</span></div>
       <div>Total: <span id="globalTotalCount">0</span></div>
       <div>Yield: <span id="globalYield">-</span></div>
+      <button class="vp-btn" id="resetCountersBtn" style="padding: 4px 10px; font-size: 11px;">Reset counters</button>
     </div>
     <div class="toolbar-spacer"></div>
     <div class="backend-badge"><span class="dot"></span><span id="backendLabel">CPU backend</span></div>
@@ -2378,6 +2379,27 @@ async function pollSystemStatus() {
 
 setInterval(pollSystemStatus, 1000);
 pollSystemStatus();
+
+const resetCountersBtn = document.getElementById('resetCountersBtn');
+if (resetCountersBtn) {
+  resetCountersBtn.addEventListener('click', async () => {
+    try {
+      const res = await fetch('/api/v1/inspection/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ module_id: activeModuleId }),
+      });
+      if (res.ok) {
+        await pollSystemStatus();
+        log('Counters reset for ' + activeModuleId, 'ok');
+      } else {
+        log('Reset counters failed (HTTP ' + res.status + ')', 'warn');
+      }
+    } catch (e) {
+      log('Reset counters failed: ' + e.message, 'warn');
+    }
+  });
+}
 
 // Camera settings UI
 const autoExposureToggle = document.getElementById('autoExposureToggle');
