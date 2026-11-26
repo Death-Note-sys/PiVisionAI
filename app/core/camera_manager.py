@@ -39,6 +39,7 @@ class CameraManager:
         self._capture_thread = None
         self._processing_thread = None
         self._cap_lock = threading.Lock()
+        self._lifecycle_lock = threading.RLock()
         self.camera_settings = {
             "auto_exposure": True,
             "exposure": -5.0,
@@ -56,6 +57,8 @@ class CameraManager:
             
         readback = {}
         with self._cap_lock:
+            if not self.cap or not self.is_connected:
+                return dict(settings)
             # Auto Exposure
             if "auto_exposure" in settings:
                 is_auto = bool(settings["auto_exposure"])
@@ -142,38 +145,60 @@ class CameraManager:
 
     def start(self):
         """Start the capture and processing threads."""
-        if self._capture_thread and self._capture_thread.is_alive():
-            return
+        with self._lifecycle_lock:
+            if self._capture_thread and self._capture_thread.is_alive():
+                return
+                
+            self._stop_event.clear()
+            self._open_camera()
             
-        self._stop_event.clear()
-        self._open_camera()
-        
-        self._capture_thread = threading.Thread(target=self._capture_loop, daemon=True, name="CameraCapture")
-        self._processing_thread = threading.Thread(target=self._processing_loop, daemon=True, name="CameraProcess")
-        
-        self._capture_thread.start()
-        self._processing_thread.start()
-        
-        self.event_bus.publish("CameraStarted", {"index": self.camera_index})
-        logger.info("CameraManager threads started.")
+            self._capture_thread = threading.Thread(target=self._capture_loop, daemon=True, name="CameraCapture")
+            self._processing_thread = threading.Thread(target=self._processing_loop, daemon=True, name="CameraProcess")
+            
+            self._capture_thread.start()
+            self._processing_thread.start()
+            
+            self.event_bus.publish("CameraStarted", {"index": self.camera_index})
+            logger.info("CameraManager threads started.")
 
     def stop(self):
         """Stop threads and release hardware."""
-        self._stop_event.set()
-        if self._capture_thread: self._capture_thread.join(timeout=2.0)
-        if self._processing_thread: self._processing_thread.join(timeout=2.0)
-        
-        if self.cap:
-            self.cap.release()
-            self.is_connected = False
+        with self._lifecycle_lock:
+            self._stop_event.set()
+            cap_thread = self._capture_thread
+            proc_thread = self._processing_thread
+            if cap_thread:
+                cap_thread.join(timeout=2.0)
+            if proc_thread:
+                proc_thread.join(timeout=2.0)
             
-        self.event_bus.publish("CameraStopped", {"index": self.camera_index})
-        logger.info("CameraManager stopped.")
+            with self._cap_lock:
+                if self.cap is not None:
+                    try:
+                        self.cap.release()
+                    finally:
+                        self.cap = None
+                self.is_connected = False
+
+            # If a slow cap.read() delayed thread exit past the initial join, wait briefly now that _cap_lock cleared.
+            if cap_thread and cap_thread.is_alive():
+                cap_thread.join(timeout=1.0)
+            if not cap_thread or not cap_thread.is_alive():
+                self._capture_thread = None
+            if not proc_thread or not proc_thread.is_alive():
+                self._processing_thread = None
+            self._raw_frames.clear()
+                
+            self.event_bus.publish("CameraStopped", {"index": self.camera_index})
+            logger.info("CameraManager stopped.")
 
     def _open_camera(self) -> bool:
         with self._cap_lock:
-            if self.cap:
-                self.cap.release()
+            if self.cap is not None:
+                try:
+                    self.cap.release()
+                finally:
+                    self.cap = None
                 
             self.camera_index = int(self.config.get("camera_index", self.camera_index))
             raw_backend = str(self.config.get("camera_backend", "auto")).lower()
@@ -190,13 +215,19 @@ class CameraManager:
             
             opened = False
             for backend in backends:
-                self.cap = cv2.VideoCapture(self.camera_index, backend)
-                if self.cap.isOpened():
+                cap = cv2.VideoCapture(self.camera_index, backend)
+                if cap.isOpened():
+                    self.cap = cap
                     opened = True
                     break
+                try:
+                    cap.release()
+                except Exception:
+                    pass
 
                     
             if not opened:
+                self.cap = None
                 self.is_connected = False
                 logger.error(f"Failed to open Camera {self.camera_index}.")
                 return False
@@ -221,12 +252,16 @@ class CameraManager:
         """Producer: Grab frames as fast as hardware allows to clear buffers."""
         while not self._stop_event.is_set():
             if not self.is_connected:
-                time.sleep(1.0)
+                if self._stop_event.wait(1.0):
+                    break
                 self._open_camera()
                 continue
                 
             with self._cap_lock:
-                ret, frame = self.cap.read()
+                if self._stop_event.is_set() or not self.is_connected or self.cap is None:
+                    ret, frame = False, None
+                else:
+                    ret, frame = self.cap.read()
                 
             if ret:
                 self._raw_frames.append(frame)

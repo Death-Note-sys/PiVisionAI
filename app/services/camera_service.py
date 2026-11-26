@@ -1,4 +1,5 @@
 import logging
+import threading
 from typing import Dict, Any, Generator
 from app.core.container import Container
 
@@ -11,6 +12,7 @@ class CameraService:
         self.container = Container.get_instance()
         self.camera_manager = self.container.camera_manager
         self.output_manager = self.container.output_manager
+        self._switch_lock = threading.Lock()
 
     def get_stream(self) -> Generator[bytes, None, None]:
         """Return the MJPEG stream generator."""
@@ -21,19 +23,25 @@ class CameraService:
     def switch_camera(self, index: int, resolution: str, backend: str = None) -> bool:
         """Switch camera hardware or resolution and persist settings."""
         try:
-            # Need to restart camera manager to apply changes cleanly
-            self.camera_manager.stop()
-            updates = {
-                "camera_index": index,
-                "camera_resolution": resolution
-            }
-            if backend:
-                updates["camera_backend"] = backend
-            self.container.config.update_settings(updates)
-            # Re-init is handled in start based on config
-            self.camera_manager.camera_index = index
-            self.camera_manager.start()
-            return True
+            index = int(index)
+            parts = str(resolution).lower().split("x")
+            if len(parts) != 2 or int(parts[0]) <= 0 or int(parts[1]) <= 0:
+                raise ValueError(f"Invalid resolution: {resolution}")
+
+            # Serialize hardware teardown/open so concurrent switch requests never race on VideoCapture.
+            with self._switch_lock:
+                self.camera_manager.stop()
+                updates = {
+                    "camera_index": index,
+                    "camera_resolution": resolution
+                }
+                if backend:
+                    updates["camera_backend"] = backend
+                self.container.config.update_settings(updates)
+                # Re-init is handled in start based on config
+                self.camera_manager.camera_index = index
+                self.camera_manager.start()
+                return True
         except Exception as e:
             logger.error(f"Failed to switch camera: {e}")
             return False

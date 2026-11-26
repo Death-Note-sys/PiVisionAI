@@ -1274,9 +1274,13 @@ document.getElementById('moduleSelect').addEventListener('change', (e) => setAct
 
 // ---------- Camera source switching ----------
 async function switchCamera() {
-  const index = parseInt(document.getElementById('cameraIndexSelect').value);
-  const resolution = document.getElementById('cameraResolutionSelect').value;
+  const indexEl = document.getElementById('cameraIndexSelect');
+  const resEl = document.getElementById('cameraResolutionSelect');
+  const index = parseInt(indexEl.value, 10) || 0;
+  const resolution = resEl.value || '1280x720';
   log('Switching to camera ' + index + ' at ' + resolution + '…');
+  if (indexEl) indexEl.disabled = true;
+  if (resEl) resEl.disabled = true;
   try {
     const res = await fetch('/api/v1/camera/switch', {
       method: 'POST',
@@ -1292,6 +1296,9 @@ async function switchCamera() {
     }
   } catch (e) {
     log('Camera switch request failed: ' + e.message, 'warn');
+  } finally {
+    if (indexEl) indexEl.disabled = false;
+    if (resEl) resEl.disabled = false;
   }
 }
 document.getElementById('cameraIndexSelect').addEventListener('change', switchCamera);
@@ -2520,28 +2527,6 @@ if (rescanCamerasBtn) {
   rescanCamerasBtn.addEventListener('click', () => scanCameraDevices());
 }
 
-async function switchCameraHardware() {
-  const index = parseInt(cameraIndexSelect.value) || 0;
-  const resolution = cameraResolutionSelect.value || '1280x720';
-  try {
-    const res = await fetch('/api/v1/camera/switch', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ index, resolution })
-    });
-    const data = await res.json();
-    if (data.success) {
-      log('Switched to Camera ' + index + ' (' + resolution + ')');
-    } else {
-      log('Camera switch failed: ' + (data.error || 'unknown error'), 'error');
-    }
-  } catch(e) {
-    log('Camera switch request failed: ' + e.message, 'error');
-  }
-}
-
-if (cameraIndexSelect) cameraIndexSelect.addEventListener('change', switchCameraHardware);
-if (cameraResolutionSelect) cameraResolutionSelect.addEventListener('change', switchCameraHardware);
 scanCameraDevices();
 
 // Initialize the backend and UI state on page load (force = true: see setActiveModule)

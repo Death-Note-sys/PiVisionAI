@@ -1,3 +1,4 @@
+from contextlib import nullcontext
 from flask import Blueprint, jsonify, request, Response
 from app.services.camera_service import CameraService
 import cv2
@@ -45,12 +46,14 @@ def get_camera_devices():
             # CameraManager holds this device; report as in use
             width = 640
             height = 480
-            if mgr.cap and mgr.cap.isOpened():
-                try:
-                    width = int(mgr.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-                    height = int(mgr.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-                except Exception:
-                    pass
+            cap_lock = getattr(mgr, "_cap_lock", None) or nullcontext()
+            with cap_lock:
+                if mgr.cap and mgr.cap.isOpened():
+                    try:
+                        width = int(mgr.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                        height = int(mgr.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                    except Exception:
+                        pass
             devices.append({
                 "index": idx,
                 "opened": True,
