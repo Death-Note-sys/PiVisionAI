@@ -88,3 +88,68 @@ def test_continuous_no_trigger_zero_rows_zero_segmenter_calls():
     assert seg.segment.call_count == 0
     # Result is the default (no extraction ran)
     assert result.area_px == 0
+
+
+def test_renderer_cutout_paints_background_outside_mask():
+    """In cutout mode, pixels outside the mask equal background color (24, 24, 24)."""
+    from app.core.renderers.target_extraction_renderer import TargetExtractionRenderer
+    from app.core.models.results import TargetExtractionResult
+
+    renderer = TargetExtractionRenderer()
+    h, w = 120, 160
+    frame = np.full((h, w, 3), 200, dtype=np.uint8)
+    mask = np.zeros((h, w), dtype=np.uint8)
+    mask[40:80, 50:120] = 255
+
+    result = TargetExtractionResult(
+        roi_status="Taught",
+        engine="grabcut",
+        area_px=int((mask > 0).sum()),
+        area_ratio=0.5,
+        roi={"x": 45, "y": 35, "w": 80, "h": 50},
+    )
+    result._mask = mask
+    result._view_mode = "cutout"
+
+    # Full background check when show_info is disabled
+    out_clean = renderer.render(frame, result, {"settings": {"view_mode": "cutout", "show_info": False}})
+    assert np.all(out_clean[mask == 0] == (24, 24, 24))
+    assert np.all(out_clean[mask > 0] == (200, 200, 200))
+
+    # Default settings via _view_mode PrivateAttr also render cutout background
+    out_default = renderer.render(frame, result, {"settings": {}})
+    assert tuple(out_default[0, 0]) == (24, 24, 24)
+    assert tuple(out_default[60, 80]) == (200, 200, 200)
+    # PrivateAttr must not leak into serialized JSON dict
+    assert "_mask" not in result.model_dump()
+
+
+def test_controller_render_attaches_mask_for_triggered_and_rerendered_cutout(tmp_path, monkeypatch):
+    """Controller stores _last_mask and attaches it on both triggered and non-triggered renders."""
+    from app.core.renderers.target_extraction_renderer import TargetExtractionRenderer
+
+    monkeypatch.setenv("PI_VISION_DATA_DIR", str(tmp_path))
+    seg = _fake_seg()
+    ctrl = _make_controller(segmenter=seg)
+    ctrl.configure({"view_mode": "cutout"})
+    frame = np.full((120, 160, 3), 180, dtype=np.uint8)
+    renderer = TargetExtractionRenderer()
+
+    # 1. Triggered frame runs segmentation once and renders cutout
+    res1 = ctrl.process({"frame": frame, "triggered": True})
+    instr1 = ctrl.render(res1)
+    assert instr1._mask is not None
+    out1 = renderer.render(frame, instr1, {"settings": {}})
+    assert tuple(out1[0, 0]) == (24, 24, 24)
+    # Interior foreground point below the info text baseline (y=45) and inside ROI (20..80, 20..70)
+    assert tuple(out1[58, 50]) == (180, 180, 180)
+    assert seg.segment.call_count == 1
+
+    # 2. Non-triggered frame reuses last_result and stored mask without re-running segmenter
+    res2 = ctrl.process({"frame": frame, "triggered": False})
+    instr2 = ctrl.render(res2)
+    assert instr2._mask is not None
+    out2 = renderer.render(frame, instr2, {"settings": {}})
+    assert tuple(out2[0, 0]) == (24, 24, 24)
+    assert tuple(out2[58, 50]) == (180, 180, 180)
+    assert seg.segment.call_count == 1

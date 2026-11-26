@@ -68,6 +68,7 @@ class TargetExtractionController(BaseModuleController):
         # Runtime state
         self.last_frame: Optional[np.ndarray] = None
         self.last_result: TargetExtractionResult = TargetExtractionResult()
+        self._last_mask: Optional[np.ndarray] = None
         self._lazy_segmenter = None    # created on first SAM use
         self._lock = threading.Lock()
 
@@ -97,6 +98,7 @@ class TargetExtractionController(BaseModuleController):
             self._lazy_segmenter = None
             self._segmenter_override = None
             self.last_frame = None
+            self._last_mask = None
         logger.info("TargetExtractionController cleaned up.")
 
     def health_check(self) -> bool:
@@ -145,6 +147,7 @@ class TargetExtractionController(BaseModuleController):
         with self._lock:
             self._roi_box = None
             self.roi_status = "Untaught"
+            self._last_mask = None
 
         self.save_data({"roi_status": "Untaught", "roi_box": {}})
         self.event_bus.publish("TargetExtractionROIReset", {})
@@ -199,6 +202,8 @@ class TargetExtractionController(BaseModuleController):
             if judge_enabled:
                 is_ok = False
                 reason = "not configured"
+            with self._lock:
+                self._last_mask = None
             result = TargetExtractionResult(
                 roi_status="Untaught",
                 is_ok=is_ok,
@@ -229,6 +234,8 @@ class TargetExtractionController(BaseModuleController):
             )
         except Exception as exc:
             logger.error(f"TargetExtractionController.process error: {exc}")
+            with self._lock:
+                self._last_mask = None
             result = TargetExtractionResult(
                 roi_status="Taught",
                 engine=None,
@@ -277,6 +284,9 @@ class TargetExtractionController(BaseModuleController):
                 logger.warning(f"Could not write last_extraction.png: {exc}")
 
         rx, ry, rw, rh = roi_box
+        mask_copy = extraction.mask.copy()
+        with self._lock:
+            self._last_mask = mask_copy
         result = TargetExtractionResult(
             roi_status="Taught",
             engine=extraction.engine,
@@ -292,6 +302,8 @@ class TargetExtractionController(BaseModuleController):
             latency_ms=(time.perf_counter() - start) * 1000,
             timestamp=time.time(),
         )
+        result._mask = mask_copy
+        result._view_mode = s.get("view_mode", "overlay")
         self.last_result = result
         self.event_bus.publish("TargetExtractionComplete", {
             "engine": extraction.engine,
@@ -301,4 +313,7 @@ class TargetExtractionController(BaseModuleController):
         return result
 
     def render(self, result: TargetExtractionResult) -> Any:
+        with self._lock:
+            result._mask = self._last_mask
+            result._view_mode = self.settings.get_settings().get("view_mode", "overlay")
         return result

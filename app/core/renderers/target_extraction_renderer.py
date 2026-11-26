@@ -26,7 +26,7 @@ class TargetExtractionRenderer(BaseRenderer):
 
         out = frame.copy()
         settings = metadata.get("settings", {})
-        view_mode = settings.get("view_mode", getattr(result, "__view_mode__", "overlay"))
+        view_mode = settings.get("view_mode") or getattr(result, "_view_mode", getattr(result, "__view_mode__", "overlay"))
         show_info = settings.get("show_info", True)
         thickness = max(1, int(settings.get("thickness", 2)))
 
@@ -61,9 +61,19 @@ class TargetExtractionRenderer(BaseRenderer):
         engine = getattr(result, "engine", None) or "?"
         fallback = getattr(result, "fallback_reason", None)
 
-        if area_px > 0 and hasattr(result, "_mask") and result._mask is not None:
-            # Mask is not stored in result (it would be too large); skip tint
-            pass
+        mask = getattr(result, "_mask", None)
+        if area_px > 0 and mask is not None and mask.shape[:2] == out.shape[:2]:
+            if view_mode == "cutout":
+                out = composite_on_color(out, mask, color=(24, 24, 24))
+            else:
+                tint = np.zeros_like(out)
+                tint[:] = (0, 180, 0)
+                keep = mask > 0
+                if np.any(keep):
+                    out[keep] = cv2.addWeighted(out[keep], 0.6, tint[keep], 0.4, 0)
+                bin_mask = keep.astype(np.uint8) * 255
+                contours, _ = cv2.findContours(bin_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                cv2.drawContours(out, contours, -1, (0, 220, 0), thickness)
 
         # Info line
         if show_info:

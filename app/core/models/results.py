@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, PrivateAttr
 from typing import List, Dict, Any, Optional
 
 class ModuleResult(BaseModel):
@@ -85,3 +85,5 @@ class TargetExtractionResult(ModuleResult):
     roi: Optional[Dict[str, Any]] = None   # the ROI box {x,y,w,h}
     is_ok: Optional[bool] = None
     reason: Optional[str] = None
+    _mask: Optional[Any] = PrivateAttr(default=None)
+    _view_mode: str = PrivateAttr(default="overlay")
