@@ -22,7 +22,10 @@ class OutputManager(IOutputManager):
         
         import collections
         self.ng_queue = collections.deque(maxlen=50)
-        self.ng_thread = threading.Thread(target=self._ng_worker, daemon=True)
+        self._stop_event = threading.Event()
+        self.ng_thread = threading.Thread(
+            target=self._ng_worker, daemon=True, name="OutputManager-_ng_worker"
+        )
         self.ng_thread.start()
         
     def save_ng(self, frame: np.ndarray, metadata: Dict[str, Any], file_path: str = None) -> None:
@@ -34,9 +37,11 @@ class OutputManager(IOutputManager):
     def _ng_worker(self):
         import os
         from datetime import datetime
-        while True:
+        while not self._stop_event.is_set():
             if self.ng_queue:
                 frame, meta, explicit_path = self.ng_queue.popleft()
+                if self._stop_event.is_set():
+                    break
                 try:
                     from app.core.container import Container
                     container = Container.get_instance()
@@ -57,7 +62,18 @@ class OutputManager(IOutputManager):
                 except Exception as e:
                     logger.error(f"Error saving NG image: {e}")
             else:
-                time.sleep(0.1)
+                self._stop_event.wait(0.1)
+
+    def shutdown(self, timeout: float = 2.0) -> None:
+        """Stop and join the background NG worker thread cleanly."""
+        self._stop_event.set()
+        if self.ng_thread and self.ng_thread.is_alive():
+            self.ng_thread.join(timeout=timeout)
+        self.stop_recording()
+
+    def stop(self, timeout: float = 2.0) -> None:
+        """Alias for shutdown()."""
+        self.shutdown(timeout=timeout)
         
     def add_client(self, client_id: str, client_type: str = "mjpeg") -> None:
         self.clients[client_id] = client_type

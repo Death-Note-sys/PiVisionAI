@@ -56,13 +56,33 @@ def fake_cv2_videocapture(monkeypatch):
     monkeypatch.setattr(cv2, "VideoCapture", FakeVideoCapture)
 
 @pytest.fixture(autouse=True)
-def clear_container():
-    """Ensure clean container instance and clean thread/camera/modbus teardown."""
+def clear_container(monkeypatch):
+    """Ensure clean container instance and clean thread/camera/output/modbus teardown."""
     from app.core.container import Container
+    from app.core.output_manager import OutputManager
+
+    created_outputs = []
+    created_containers = []
+    orig_om_init = OutputManager.__init__
+    orig_container_init = Container.__init__
+
+    def _tracked_om_init(self, *args, **kwargs):
+        orig_om_init(self, *args, **kwargs)
+        created_outputs.append(self)
+
+    def _tracked_container_init(self, *args, **kwargs):
+        orig_container_init(self, *args, **kwargs)
+        created_containers.append(self)
+
+    monkeypatch.setattr(OutputManager, "__init__", _tracked_om_init)
+    monkeypatch.setattr(Container, "__init__", _tracked_container_init)
+
     if Container._instance is not None:
         try:
             if hasattr(Container._instance, "camera_manager") and Container._instance.camera_manager:
                 Container._instance.camera_manager.stop()
+            if hasattr(Container._instance, "output_manager") and Container._instance.output_manager:
+                Container._instance.output_manager.shutdown()
             Container._instance.shutdown()
         except Exception:
             pass
@@ -72,8 +92,23 @@ def clear_container():
         try:
             if hasattr(Container._instance, "camera_manager") and Container._instance.camera_manager:
                 Container._instance.camera_manager.stop()
+            if hasattr(Container._instance, "output_manager") and Container._instance.output_manager:
+                Container._instance.output_manager.shutdown()
             Container._instance.shutdown()
         except Exception:
             pass
+    for om in dict.fromkeys(created_outputs):
+        try:
+            om.shutdown()
+        except Exception:
+            pass
+    seen_containers = set()
+    for c in created_containers:
+        if c is not Container._instance and id(c) not in seen_containers:
+            seen_containers.add(id(c))
+            try:
+                c.shutdown()
+            except Exception:
+                pass
     Container._instance = None
 

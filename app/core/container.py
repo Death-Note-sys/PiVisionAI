@@ -89,6 +89,7 @@ class Container:
         logger.info("Shutting down services...")
         if hasattr(self, 'task_scheduler'): self.task_scheduler.shutdown()
         if hasattr(self, 'camera_manager'): self.camera_manager.stop()
+        if hasattr(self, 'output_manager'): self.output_manager.shutdown()
         if hasattr(self, 'ai_runtime'): self.ai_runtime.shutdown()
         if hasattr(self, 'resource_manager'): self.resource_manager.shutdown()
         if hasattr(self, 'hardware_manager'): self.hardware_manager.stop()
