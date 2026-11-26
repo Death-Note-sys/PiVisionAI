@@ -325,3 +325,31 @@ def test_service_propagates_reteach_status_to_telemetry(clean_counting_data):
     svc = ObjectCountingService(settings, module_ref=controller)
     status = svc.get_status()
     assert status["telemetry"]["template_status"].startswith("Re-teach")
+
+
+def test_reteach_warning_clears_immediately_on_teach_and_reset(clean_counting_data):
+    from app.modules.object_counting.service import ObjectCountingService
+
+    bus = EventBus()
+    settings = ObjectCountingSettings()
+    controller = ObjectCountingController(bus, settings)
+    svc = ObjectCountingService(settings, module_ref=controller)
+
+    tmpl = make_template(32, 7)
+    controller.on_raw_frame(make_scene(tmpl, POSITIONS, shape=(720, 1280)))
+    assert controller.teach_template(10, 10, 32, 32) is True
+
+    # Trigger resolution mismatch -> Re-teach warning
+    controller.process({"frame": np.zeros((480, 640, 3), dtype=np.uint8)})
+    assert svc.get_status()["telemetry"]["template_status"].startswith("Re-teach")
+
+    # Re-teaching at the new resolution clears Re-teach immediately without another process()
+    controller.on_raw_frame(make_scene(tmpl, POSITIONS, shape=(480, 640)))
+    assert controller.teach_template(10, 10, 32, 32) is True
+    assert svc.get_status()["telemetry"]["template_status"] == "Taught"
+
+    # Trigger resolution mismatch again, then reset_template -> clears to Untaught immediately
+    controller.process({"frame": np.zeros((720, 1280, 3), dtype=np.uint8)})
+    assert svc.get_status()["telemetry"]["template_status"].startswith("Re-teach")
+    assert controller.reset_template() is True
+    assert svc.get_status()["telemetry"]["template_status"] == "Untaught"

@@ -178,6 +178,7 @@ class ObjectCountingController(BaseModuleController):
             self.taught_frame_width = fw
             self.taught_frame_height = fh
             self.last_teach_error = None
+            self.last_result = ObjectCountingResult(template_status="Taught")
 
         self.save_data({
             "template_status": "Taught",
@@ -196,6 +197,7 @@ class ObjectCountingController(BaseModuleController):
             self.taught_frame_width = None
             self.taught_frame_height = None
             self.last_teach_error = None
+            self.last_result = ObjectCountingResult()
 
         self.save_data({"template_status": "Untaught"})
 
