@@ -782,11 +782,11 @@
       <div class="inspector-section ai-identify-only hidden">
         <p class="inspector-title">Teach mode <span class="count-badge">max 20 per class</span></p>
 
-        <div class="gallery-label good"><span>GOOD</span><span class="count" id="goodCount">0/5</span></div>
+        <div class="gallery-label good"><span>GOOD</span><span class="count" id="goodCount">0/20</span></div>
         <div class="teach-gallery" id="goodGallery"></div>
         <button class="full-btn good" id="teachGoodBtn"><i class="ti ti-square-plus"></i> Add Good Image</button>
 
-        <div class="gallery-label bad" style="margin-top:14px;"><span>BAD</span><span class="count" id="badCount">0/5</span></div>
+        <div class="gallery-label bad" style="margin-top:14px;"><span>BAD</span><span class="count" id="badCount">0/20</span></div>
         <div class="teach-gallery" id="badGallery"></div>
         <button class="full-btn bad" id="teachBadBtn"><i class="ti ti-square-plus"></i> Add Bad Image</button>
 
@@ -1122,6 +1122,7 @@ async function setActiveModule(moduleId, force = false) {
   calibrateBtn.classList.toggle('hidden', moduleId !== 'core-measurement');
 
   if (moduleId === 'core-ai-identify') resetTeachUIState();
+  lastOcThumbStatus = null;
 
   if (moduleId === 'core-ocr' && triggerModeSelect.value === 'continuous') {
     log('OCR is slow per-frame on CPU - switch Trigger Mode (top toolbar) to Single or Interval instead of Continuous.', 'warn');
@@ -1156,6 +1157,30 @@ function restoreSlider(sliderId, valueId, value, decimals) {
 function restoreToggle(id, value) {
   if (value === undefined || value === null) return;
   setIfPresent(id, el => el.classList.toggle('on', !!value));
+}
+
+let lastOcThumbStatus = null;
+
+function loadOcTemplateThumbnail() {
+  const tmplImg = document.getElementById('ocTemplateThumbnail');
+  if (!tmplImg) return;
+  const tImg = new Image();
+  tImg.onload = () => { tmplImg.src = tImg.src; tmplImg.classList.remove('hidden'); };
+  tImg.onerror = () => {};
+  tImg.src = '/api/v1/object-counting/template.png?t=' + Date.now();
+}
+
+function hideOcTemplateThumbnail() {
+  const tmplImg = document.getElementById('ocTemplateThumbnail');
+  if (tmplImg) {
+    tmplImg.src = '';
+    tmplImg.classList.add('hidden');
+  }
+}
+
+function updateGalleryReadout(goodCount, badCount) {
+  const el = document.getElementById('statGallerySize');
+  if (el) el.textContent = goodCount + ' good / ' + badCount + ' bad';
 }
 
 async function updateModuleUIFromServer(moduleId) {
@@ -1230,18 +1255,12 @@ async function updateModuleUIFromServer(moduleId) {
     setIfPresent('ocCountMinInput', el => { if (s.count_min != null) el.value = s.count_min; });
     setIfPresent('ocCountMaxInput', el => { if (s.count_max != null) el.value = s.count_max; });
     // Reload template thumbnail from server (never from browser memory)
-    const tmplImg = document.getElementById('ocTemplateThumbnail');
-    if (tmplImg) {
-      const tmplStatus = t.template_status || 'Untaught';
-      if (tmplStatus === 'Taught') {
-        const tImg = new Image();
-        tImg.onload = () => { tmplImg.src = tImg.src; tmplImg.classList.remove('hidden'); };
-        tImg.onerror = () => {};
-        tImg.src = '/api/v1/object-counting/template.png?t=' + Date.now();
-      } else {
-        tmplImg.src = '';
-        tmplImg.classList.add('hidden');
-      }
+    const tmplStatus = t.template_status || 'Untaught';
+    lastOcThumbStatus = tmplStatus;
+    if (tmplStatus !== 'Untaught') {
+      loadOcTemplateThumbnail();
+    } else {
+      hideOcTemplateThumbnail();
     }
 
   } else if (moduleId === 'core-target-extraction') {
@@ -1431,7 +1450,7 @@ function beginPolling() {
 
         const goodCount = telemetry.good_reference_count ?? 0;
         const badCount = telemetry.bad_reference_count ?? 0;
-        document.getElementById('statGallerySize').textContent = goodCount + ' good / ' + badCount + ' bad';
+        updateGalleryReadout(goodCount, badCount);
 
       } else if (activeModuleId === 'core-ocr') {
         document.getElementById('statOcrModel').textContent = telemetry.model_name || '—';
@@ -1477,10 +1496,19 @@ function beginPolling() {
         else { matchEl.textContent = '—'; matchEl.className = 'value'; }
 
       } else if (activeModuleId === 'core-object-counting') {
+        const tmplStatus = telemetry.template_status || 'Untaught';
         const tmplStatusEl = document.getElementById('ocStatTemplateStatus');
         if (tmplStatusEl) {
-          tmplStatusEl.textContent = telemetry.template_status || 'Untaught';
-          tmplStatusEl.className = 'value ' + (telemetry.template_status === 'Taught' ? 'ok' : 'warn');
+          tmplStatusEl.textContent = tmplStatus;
+          tmplStatusEl.className = 'value ' + (tmplStatus === 'Taught' ? 'ok' : 'warn');
+        }
+        if (tmplStatus !== lastOcThumbStatus) {
+          lastOcThumbStatus = tmplStatus;
+          if (tmplStatus !== 'Untaught') {
+            loadOcTemplateThumbnail();
+          } else {
+            hideOcTemplateThumbnail();
+          }
         }
         const countEl = document.getElementById('ocStatCount');
         if (countEl) {
@@ -1760,8 +1788,8 @@ wireToggle('showDimsToggle', 'show_dimensions');
     ocResetTemplateBtn.addEventListener('click', async () => {
       const result = await ocApiPost('/reset-template');
       if (result.success) {
-        const tmplImg = document.getElementById('ocTemplateThumbnail');
-        if (tmplImg) { tmplImg.src = ''; tmplImg.classList.add('hidden'); }
+        lastOcThumbStatus = 'Untaught';
+        hideOcTemplateThumbnail();
         log('OC template reset', 'ok');
       } else {
         log('OC reset template failed: ' + (result.error || 'unknown error'), 'warn');
@@ -2041,6 +2069,7 @@ function renderGallery(containerEl, thumbnails, cls) {
   countEl.textContent = thumbnails.length + '/' + MAX_REFS;
   const btn = cls === 'good' ? teachGoodBtn : teachBadBtn;
   btn.disabled = thumbnails.length >= MAX_REFS;
+  updateGalleryReadout(goodThumbnails.length, badThumbnails.length);
 }
 
 function resetTeachUIState() {
@@ -2205,13 +2234,8 @@ teachConfirmBtn.addEventListener('click', async () => {
     const errEl = document.getElementById('ocTeachError');
     if (result.success) {
       // Always load thumbnail from server so it matches what the backend stores
-      const tmplImg = document.getElementById('ocTemplateThumbnail');
-      if (tmplImg) {
-        const tImg = new Image();
-        tImg.onload = () => { tmplImg.src = tImg.src; tmplImg.classList.remove('hidden'); };
-        tImg.onerror = () => {};
-        tImg.src = '/api/v1/object-counting/template.png?t=' + Date.now();
-      }
+      lastOcThumbStatus = 'Taught';
+      loadOcTemplateThumbnail();
       if (errEl) errEl.style.display = 'none';
       log('OC template taught', 'ok');
       endTeach();
