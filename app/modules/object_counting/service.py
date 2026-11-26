@@ -74,6 +74,9 @@ class ObjectCountingService(IService):
         }
         if self.module_ref and hasattr(self.module_ref, "last_result"):
             r = self.module_ref.last_result
+            r_status = getattr(r, "template_status", "")
+            if isinstance(r_status, str) and r_status.startswith("Re-teach"):
+                tpl_status = r_status
             status["telemetry"].update({
                 "template_status": tpl_status,
                 "count": r.count,

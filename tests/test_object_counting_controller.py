@@ -303,3 +303,25 @@ def test_resolution_safety_old_data_without_size_works(clean_counting_data):
     res = controller.process({"frame": scene})
     assert res.count == len(POSITIONS)
     assert res.template_status == "Taught"
+
+
+def test_service_propagates_reteach_status_to_telemetry(clean_counting_data):
+    from app.modules.object_counting.service import ObjectCountingService
+
+    bus = EventBus()
+    settings = ObjectCountingSettings()
+    controller = ObjectCountingController(bus, settings)
+
+    # Teach at 1280x720
+    scene_1280 = make_scene(make_template(32, 7), POSITIONS, shape=(720, 1280))
+    controller.on_raw_frame(scene_1280)
+    assert controller.teach_template(10, 10, 32, 32) is True
+
+    # Process at 640x480 -> resolution mismatch sets Re-teach status on last_result
+    scene_640 = np.zeros((480, 640, 3), dtype=np.uint8)
+    res = controller.process({"frame": scene_640})
+    assert res.template_status.startswith("Re-teach")
+
+    svc = ObjectCountingService(settings, module_ref=controller)
+    status = svc.get_status()
+    assert status["telemetry"]["template_status"].startswith("Re-teach")
